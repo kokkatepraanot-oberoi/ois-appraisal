@@ -1,31 +1,18 @@
-
-import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials
+from oauth2client.service_account import ServiceAccountCredentials
+import streamlit as st
+import json
 
-# Authorize client
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive",
-]
-creds = Credentials.from_service_account_info(st.secrets["google"], scopes=scope)
+# Load Google Service Account credentials from Streamlit secrets
+creds_dict = st.secrets["google"]
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    creds_dict, 
+    scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+)
 client = gspread.authorize(creds)
 
-# Use hardcoded ID
-SPREADSHEET_ID = "1kqcfmMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
+# ✅ Hardcoded Spreadsheet ID
+SPREADSHEET_ID = "1kqcfmMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJyp0jpY"
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
-st.title("OIS Appraisal System")
-
-# Example read
-data = sheet.get_all_records()
-st.write("Current data in sheet:", data)
-
-# Example append
-with st.form("appraisal_form"):
-    name = st.text_input("Your Name")
-    rating = st.slider("Rating", 1, 5)
-    submitted = st.form_submit_button("Submit")
-    if submitted:
-        sheet.append_row([name, rating])
-        st.success("✅ Response recorded!")
+st.success("Connected to Google Sheet successfully!")
