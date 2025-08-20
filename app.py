@@ -1,9 +1,23 @@
 # app.py
+import time
+from datetime import datetime
+
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
 import pandas as pd
+
+# Try to import HttpError; fall back gracefully if googleapiclient isn't present
+try:
+    from googleapiclient.errors import HttpError  # type: ignore
+except Exception:  # pragma: no cover
+    class HttpError(Exception):
+        pass
+
+# =========================
+# UI CONFIG (must be first)
+# =========================
+st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
 
 # =========================
 # CONFIG
@@ -14,7 +28,6 @@ ENABLE_REFLECTIONS = True  # set to False if you want to hide reflection boxes
 
 # =========================
 # DOMAINS & SUB-STRANDS (exact from rubric)
-# code and short label -> "A1 Expertise" etc. are used as sheet headers
 # =========================
 DOMAINS = {
     "A: Planning and Preparation for Learning": [
@@ -93,6 +106,45 @@ RATINGS = [
 ]
 
 # =========================
+# Small retry/backoff for Sheets calls (handles 429/5xx)
+# =========================
+def with_backoff(fn, *args, **kwargs):
+    """Retry gspread/api calls briefly on 429/5xx."""
+    max_attempts = 5
+    delay = 0.6  # seconds
+    last_exc = None
+    for _ in range(max_attempts):
+        try:
+            return fn(*args, **kwargs)
+        except HttpError as e:  # googleapiclient
+            status = getattr(e, "status_code", None)
+            if status in (429, 500, 502, 503, 504):
+                time.sleep(delay)
+                delay *= 2
+                last_exc = e
+                continue
+            raise
+        except gspread.exceptions.APIError as e:  # gspread-wrapped
+            msg = str(e).lower()
+            if any(code in msg for code in ["429", "500", "502", "503", "504"]):
+                time.sleep(delay)
+                delay *= 2
+                last_exc = e
+                continue
+            raise
+        except Exception as e:
+            # Non-HTTP transient error: try once more with backoff
+            time.sleep(delay)
+            delay *= 2
+            last_exc = e
+            continue
+    # Exhausted attempts
+    if last_exc:
+        raise last_exc
+    # Fallback
+    return fn(*args, **kwargs)
+
+# =========================
 # ONE-TIME SHEETS CONNECTION
 # =========================
 def connect_sheets():
@@ -101,7 +153,7 @@ def connect_sheets():
     try:
         ss = client.open_by_key(SPREADSHEET_ID)
     except Exception as e:
-        st.error("⚠️ Could not access Google Sheet. Please confirm the service account has **Editor** access.")
+        st.error("⚠️ Could not access Google Sheet. Please confirm the service account has **Editor** access and the Sheet ID is correct.")
         st.caption(f"Debug info: {e}")
         st.stop()
     return ss
@@ -111,99 +163,128 @@ RESP_WS = SS.worksheet("Responses")
 USERS_WS = SS.worksheet("Users")
 
 # =========================
-# CACHING (quota‑friendly)
+# HEADER MANAGEMENT (safe, non-destructive)
 # =========================
-@st.cache_data(ttl=300)  # cache Users for 5 minutes shared by all users
-def load_users_cached():
-    return USERS_WS.get_all_records()
-
-# Optional: cached admin data view (if you add an admin page later)
-@st.cache_data(ttl=120)
-def load_responses_cached():
-    return RESP_WS.get_all_records()
-
-# =========================
-# HEADERS (done once per app lifetime)
-# =========================
-@st.cache_resource
-def ensure_headers_once():
-    expected = ["Timestamp", "Email", "Name", "Appraiser"]
+def expected_headers():
+    headers = ["Timestamp", "Email", "Name", "Appraiser"]
     for domain, items in DOMAINS.items():
         for code, label in items:
-            expected.append(f"{code} {label}")
+            headers.append(f"{code} {label}")
         if ENABLE_REFLECTIONS:
-            expected.append(f"{domain} Reflection")
-    current = RESP_WS.row_values(1)
-    if current != expected:
-        if current:
-            RESP_WS.delete_rows(1)
-        RESP_WS.insert_row(expected, 1)
+            headers.append(f"{domain} Reflection")
+    return headers
+
+@st.cache_resource
+def ensure_headers_once():
+    exp = expected_headers()
+    current = with_backoff(RESP_WS.row_values, 1)
+    if not current:
+        with_backoff(RESP_WS.insert_row, exp, 1)
+        return True
+    if current != exp:
+        st.warning(
+            "The existing header row in **Responses** does not match the current rubric. "
+            "Submissions will still append, but columns may be misaligned if the rubric changed. "
+            "To update safely, export data, fix headers offline, and re-import."
+        )
     return True
 
 ensure_headers_once()
 
 # =========================
+# USERS: read ONCE per server process (no per-rerun reads)
+# =========================
+@st.cache_resource
+def load_users_once_df():
+    """
+    Load a minimal range (fewer read quotas). Assumes headers on first row.
+    Adjust the range if your Users sheet has different columns/positions.
+    """
+    # Example: A: Email, B: Name, C: Appraiser — change if needed
+    values = with_backoff(USERS_WS.get_values, "A:C")
+    if not values:
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser"])
+
+    header = [c.strip() for c in values[0]]
+    data = values[1:] if len(values) > 1 else []
+    df = pd.DataFrame(data, columns=header)
+
+    # Normalize email
+    if "Email" in df.columns:
+        df["Email"] = df["Email"].astype(str).str.strip().str.lower()
+    if "Name" not in df.columns:
+        df["Name"] = ""
+    if "Appraiser" not in df.columns:
+        df["Appraiser"] = "Not Assigned"
+    return df
+
+users_df = load_users_once_df()
+
+# =========================
 # UI
 # =========================
-st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
 st.title("🌟 OIS Teacher Self‑Assessment 2025‑26")
 
-users_df = pd.DataFrame(load_users_cached())
-
 st.sidebar.header("Teacher Login")
-email = st.sidebar.text_input("School email").strip()
+email_input = st.sidebar.text_input("School email (e.g., firstname.lastname@oberoi-is.org)").strip()
 
 user_row = None
-if email:
-    match = users_df[users_df["Email"].str.lower() == email.lower()]
+if email_input:
+    # gentle domain hint (non-blocking)
+    if "@" in email_input and not email_input.lower().endswith("@oberoi-is.org"):
+        st.sidebar.info("Note: this looks like a non‑OIS address. If that’s intentional, ignore this.")
+    email_lc = email_input.lower()
+    match = users_df[users_df["Email"] == email_lc] if not users_df.empty else pd.DataFrame()
     if not match.empty:
         user_row = match.iloc[0]
         appraiser = user_row.get("Appraiser", "Not Assigned")
-        st.sidebar.success(f"Welcome **{user_row['Name']}**")
+        st.sidebar.success(f"Welcome **{user_row.get('Name', '')}**")
         st.sidebar.info(f"Your appraiser: **{appraiser}**")
     else:
         st.sidebar.error("Email not found in Users sheet.")
 
 if user_row is not None:
     st.header("📋 Self‑Assessment")
-    selections = {}
-    reflections = {}
 
+    selections: dict[str, str] = {}
+    reflections: dict[str, str] = {}
     total_items = sum(len(v) for v in DOMAINS.values())
-    selected_count = 0
 
-    for domain, items in DOMAINS.items():
-        with st.expander(domain, expanded=False):
-            for code, label in items:
-                key = f"{code}-{label}"
-                choice = st.radio(
-                    f"{code} — {label}",
-                    RATINGS,
-                    index=None,  # no default selection
-                    key=key,
-                )
-                if choice:
-                    selected_count += 1
-                selections[f"{code} {label}"] = choice or ""
-            if ENABLE_REFLECTIONS:
-                reflections[domain] = st.text_area(
-                    f"{domain} Reflection (optional)",
-                    key=f"refl-{domain}",
-                    placeholder="Notes / evidence / next steps (optional)",
-                )
+    # All inputs live inside a form → no reruns / no API calls until Submit
+    with st.form("self_assessment_form", clear_on_submit=False):
+        for domain, items in DOMAINS.items():
+            with st.expander(domain, expanded=False):
+                for code, label in items:
+                    key = f"{code}-{label}"
+                    selections[f"{code} {label}"] = st.radio(
+                        f"{code} — {label}",
+                        RATINGS,
+                        index=None,
+                        key=key,
+                    ) or ""
+                if ENABLE_REFLECTIONS:
+                    reflections[domain] = st.text_area(
+                        f"{domain} Reflection (optional)",
+                        key=f"refl-{domain}",
+                        placeholder="Notes / evidence / next steps (optional)",
+                    )
 
-    st.progress(selected_count / total_items if total_items else 0.0)
-    st.caption(f"Progress: {selected_count}/{total_items} sub‑strands completed")
+        # progress (computed locally; no API)
+        selected_count = sum(1 for v in selections.values() if v)
+        st.progress(selected_count / total_items if total_items else 0.0)
+        st.caption(f"Progress: {selected_count}/{total_items} sub‑strands completed")
 
-    if st.button("✅ Submit"):
+        submitted = st.form_submit_button("✅ Submit")
+
+    if submitted:
         if selected_count < total_items:
             st.warning("Please rate **all** sub‑strands before submitting.")
         else:
-            # Append‑only write (no re‑read)
+            # Append‑only write (single API call, with backoff)
             row = [
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                email,
-                user_row["Name"],
+                email_input,
+                user_row.get("Name", ""),
                 user_row.get("Appraiser", "Not Assigned"),
             ]
             for domain, items in DOMAINS.items():
@@ -213,8 +294,10 @@ if user_row is not None:
                     row.append(reflections.get(domain, ""))
 
             try:
-                RESP_WS.append_row(row, value_input_option="USER_ENTERED")
+                with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
                 st.success("🎉 Submitted. Thank you!")
             except Exception as e:
                 st.error("⚠️ Could not submit right now. Please try again shortly.")
                 st.caption(f"Debug info: {e}")
+else:
+    st.info("Enter your school email in the sidebar to begin.")
