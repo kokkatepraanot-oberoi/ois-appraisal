@@ -55,15 +55,22 @@ domains = {
 
 responses = {"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "User": user_email}
 
+# ---- Progress Tracking ----
+total_substrands = sum(len(v) for v in domains.values())
+completed_count = 0
+
 # ---- Loop over Domains ----
 for domain, substrands in domains.items():
-    with st.expander(domain, expanded=True):
-        st.markdown(f"## {domain}")  # Big domain header
+    with st.expander(domain, expanded=False):
+        st.markdown(f"## {domain}")  
         for sub in substrands:
-            st.markdown(f"**{sub}**")   # Make sub-strand bold & bigger
-            responses[f"{domain.split(':')[0]}_{sub}"] = st.radio(
-                "Select rating:", ratings, key=f"{domain}_{sub}", horizontal=True
+            st.markdown(f"**{sub}**")   
+            selection = st.radio(
+                "Select rating:", ratings, key=f"{domain}_{sub}", horizontal=True, index=3
             )
+            responses[f"{domain.split(':')[0]}_{sub}"] = selection
+            if selection:  # always true since default is set
+                completed_count += 1
         # Optional reflection
         responses[f"{domain.split(':')[0]}_Reflection"] = st.text_area(
             f"{domain} Reflection (optional)", key=f"{domain}_reflection"
@@ -73,11 +80,15 @@ for domain, substrands in domains.items():
 st.markdown("## Overall Reflection")
 responses["Overall_Reflection"] = st.text_area("Summarize key strengths, growth areas, and initial goal ideas (optional).")
 
+# ---- Progress Bar ----
+progress = completed_count / total_substrands
+st.sidebar.markdown("### Progress")
+st.sidebar.progress(progress)
+st.sidebar.write(f"{completed_count}/{total_substrands} sub-strands completed ({progress*100:.1f}%)")
+
 # ---- Submit ----
 if st.button("Submit Self-Assessment"):
-    # Convert dict to row
     data = [responses.get(col, "") for col in responses.keys()]
-    # Append header if sheet empty
     if len(sheet.get_all_values()) == 0:
         sheet.append_row(list(responses.keys()))
     sheet.append_row(data)
