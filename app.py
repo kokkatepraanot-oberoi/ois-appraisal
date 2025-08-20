@@ -103,28 +103,35 @@ st.sidebar.progress(progress)
 st.sidebar.write(f"{completed_count}/{total_substrands} sub-strands completed ({progress*100:.1f}%)")
 
 # ---- Submit ----
-if st.button("Submit Self-Assessment"):
-    try:
-        responses = {
-            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "User": user_email
-        }
+completed_count = count_completed()
 
-        # Collect all answers
-        for domain, substrands in domains.items():
-            for sub in substrands:
-                key = f"{domain}_{sub}"
-                responses[f"{domain.split(':')[0]}_{sub}"] = st.session_state.get(key, "")
-            responses[f"{domain.split(':')[0]}_Reflection"] = st.session_state.get(f"{domain}_reflection", "")
+if completed_count < total_substrands:
+    st.warning("⚠️ Please complete all sub-strands before submitting.")
+    st.button("Submit Self-Assessment", disabled=True)
+else:
+    if st.button("Submit Self-Assessment"):
+        try:
+            responses = {
+                "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "User": user_email
+            }
 
-        responses["Overall_Reflection"] = st.session_state.get("overall_reflection", "")
+            # Collect all answers
+            for domain, substrands in domains.items():
+                for sub in substrands:
+                    key = f"{domain}_{sub}"
+                    responses[f"{domain.split(':')[0]}_{sub}"] = st.session_state.get(key, "")
+                responses[f"{domain.split(':')[0]}_Reflection"] = st.session_state.get(f"{domain}_reflection", "")
 
-        # Append row in same column order each time
-        if len(sheet.get_all_values()) == 0:
-            sheet.append_row(list(responses.keys()))
-        sheet.append_row(list(responses.values()))
+            responses["Overall_Reflection"] = st.session_state.get("overall_reflection", "")
 
-        st.success("✅ Your self-assessment has been submitted successfully!")
+            # Append row in same column order each time
+            if len(sheet.get_all_values()) == 0:
+                sheet.append_row(list(responses.keys()))
+            sheet.append_row(list(responses.values()))
 
-    except Exception as e:
-        st.error(f"⚠️ Could not save to Google Sheets: {e}")
+            st.success("✅ Your self-assessment has been submitted successfully!")
+
+        except Exception as e:
+            st.error(f"⚠️ Could not save to Google Sheets: {e}")
+
