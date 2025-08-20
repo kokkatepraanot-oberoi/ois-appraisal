@@ -4,126 +4,159 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
-# ====== CONFIG ======
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+# ==============================
+# CONFIG
+# ==============================
 SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
+RESPONSE_SHEET = "Responses"
+USER_SHEET = "Users"
 
-# ====== AUTH ======
-creds = Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"], scopes=SCOPES
-)
-client = gspread.authorize(creds)
+# Google API Scopes
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# ====== LOAD SHEETS ======
-sheet = client.open_by_key(SPREADSHEET_ID)
-responses_ws = sheet.worksheet("Responses")
-users_ws = sheet.worksheet("Users")
+# Authenticate with Streamlit secrets
+credentials = Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
+client = gspread.authorize(credentials)
 
-# ====== APP ======
-st.set_page_config(page_title="OIS Self-Assessment", layout="wide")
-st.title("📊 OIS Self-Assessment")
+# Open Sheets
+spreadsheet = client.open_by_key(SPREADSHEET_ID)
+response_ws = spreadsheet.worksheet(RESPONSE_SHEET)
+user_ws = spreadsheet.worksheet(USER_SHEET)
 
-# Load Users into dataframe
-users_data = users_ws.get_all_records()
-df_users = pd.DataFrame(users_data)
-
-# ====== Framework: Domains + Sub-strands ======
-domains = {
-    "A: Planning and Preparation for Learning": [
-        "A1 Expertise", "A2 Goals", "A3 Units", "A4 Assessments", "A5 Anticipation",
-        "A6 Lessons", "A7 Materials", "A8 Differentiation", "A9 Environment"
+# ==============================
+# DOMAINS & SUB-STRANDS
+# ==============================
+DOMAINS = {
+    "A. Professional Expertise": [
+        "A1 Expertise",
+        "A2 Goals",
+        "A3 Knowledge",
+        "A4 Curriculum"
     ],
-    "B: Classroom Management": [
-        "B1 Expectations", "B2 Relationships", "B3 Social Emotional", "B4 Routines",
-        "B5 Responsibility", "B6 Repertoire", "B7 Prevention", "B8 Incentives"
+    "B. Learning Environment": [
+        "B1 Engagement",
+        "B2 Inclusion",
+        "B3 Differentiation"
     ],
-    "C: Delivery of Instruction": [
-        "C1 Expectations", "C2 Mindset", "C3 Framing", "C4 Connections", "C5 Clarity",
-        "C6 Repertoire", "C7 Engagement", "C8 Differentiation", "C9 Nimbleness"
+    "C. Assessment": [
+        "C1 Practices",
+        "C2 Feedback",
+        "C3 Reporting"
     ],
-    "D: Monitoring, Assessment, and Follow-Up": [
-        "D1 Criteria", "D2 Diagnosis", "D3 Goals", "D4 Feedback", "D5 Recognition",
-        "D6 Analysis", "D7 Tenacity", "D8 Support", "D9 Reflection"
+    "D. Professional Growth": [
+        "D1 Reflection",
+        "D2 Collaboration",
+        "D3 Development"
     ],
-    "E: Family and Community Outreach": [
-        "E1 Respect", "E2 Belief", "E3 Expectations", "E4 Communication", "E5 Involving",
-        "E6 Responsiveness", "E7 Reporting", "E8 Outreach", "E9 Resources"
+    "E. Responsibilities": [
+        "E1 Pastoral",
+        "E2 Duties",
+        "E3 Communication"
     ],
-    "F: Professional Responsibility": [
-        "F1 Language", "F2 Reliability", "F3 Professionalism", "F4 Judgement", "F5 Teamwork",
-        "F6 Leadership", "F7 Openness", "F8 Collaboration", "F9 Growth"
+    "F. Contribution": [
+        "F1 Community",
+        "F2 Innovation",
+        "F3 Leadership"
     ]
 }
 
-rating_options = ["Highly Effective", "Effective", "Improvement Necessary"]
+RATINGS = [
+    "Does Not Meet Standards",
+    "Approaches Standards",
+    "Meets Standards",
+    "Exceeds Standards"
+]
 
-# ====== SESSION STATE for login ======
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "teacher_name" not in st.session_state:
-    st.session_state.teacher_name = ""
-if "teacher_email" not in st.session_state:
-    st.session_state.teacher_email = ""
-if "appraiser" not in st.session_state:
-    st.session_state.appraiser = ""
+# ==============================
+# HELPER FUNCTIONS
+# ==============================
+def get_user(email):
+    """Fetch user info from Users sheet."""
+    users = user_ws.get_all_records()
+    for u in users:
+        if u["Email"].strip().lower() == email.strip().lower():
+            return u
+    return None
 
-# --- Sidebar Login / Logout ---
-st.sidebar.header("🔑 Teacher Login")
+def ensure_headers():
+    """Ensure headers exist in the Response sheet."""
+    headers = response_ws.row_values(1)
+    if not headers:
+        cols = ["Timestamp", "Name", "Email", "Appraiser"]
+        for d, subs in DOMAINS.items():
+            cols.extend(subs)
+        cols.append("Reflection")
+        response_ws.insert_row(cols, 1)
 
-if not st.session_state.logged_in:
-    email_input = st.sidebar.text_input("Enter your OIS Email").strip().lower()
-    if st.sidebar.button("Login"):
-        user_row = df_users[df_users["Email"].str.lower() == email_input]
-        if not user_row.empty:
-            st.session_state.logged_in = True
-            st.session_state.teacher_email = email_input
-            st.session_state.teacher_name = user_row.iloc[0]["Name"]
-            st.session_state.appraiser = user_row.iloc[0]["Appraiser"]
+def save_response(name, email, appraiser, ratings, reflection):
+    """Save one submission to Google Sheet."""
+    ensure_headers()
+    row = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), name, email, appraiser]
+    for d, subs in DOMAINS.items():
+        for sub in subs:
+            row.append(ratings.get(sub, ""))
+    row.append(reflection)
+    response_ws.append_row(row)
+
+def has_submitted(email):
+    """Check if user already submitted."""
+    emails = response_ws.col_values(3)  # Email column
+    return email in emails
+
+# ==============================
+# STREAMLIT APP
+# ==============================
+st.set_page_config(page_title="Teacher Self-Assessment", layout="wide")
+
+st.title("📋 Teacher Self-Assessment Form")
+
+email = st.text_input("Enter your school email:")
+
+if email:
+    user = get_user(email)
+    if not user:
+        st.error("❌ Email not found in the system. Please check with Admin.")
+    else:
+        name = user["Name"]
+        appraiser = user.get("Appraiser", "Not Assigned")
+
+        st.success(f"Welcome **{name}** 👋\n\nYour appraiser is: **{appraiser}**")
+
+        if has_submitted(email):
+            st.info("✅ You have already submitted your self-assessment. Thank you!")
         else:
-            st.sidebar.error("❌ Email not found in Users sheet.")
-else:
-    st.sidebar.success(f"✅ {st.session_state.teacher_name}")
-    st.sidebar.info(f"📌 Appraiser: {st.session_state.appraiser}")
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.teacher_email = ""
-        st.session_state.teacher_name = ""
-        st.session_state.appraiser = ""
-        st.rerun()
+            st.write("Please complete all sub-strands. Reflection is optional.")
 
-# ====== Main Content ======
-if st.session_state.logged_in:
-    st.success(f"Welcome **{st.session_state.teacher_name}** 👋")
-    st.info(f"Your appraiser is **{st.session_state.appraiser}**")
+            responses = {}
+            total = sum(len(subs) for subs in DOMAINS.values())
+            filled = 0
 
-    st.subheader("📝 Self-Assessment Form")
+            for domain, subs in DOMAINS.items():
+                st.subheader(domain)
+                for sub in subs:
+                    choice = st.radio(
+                        sub,
+                        RATINGS,
+                        key=sub,
+                        horizontal=True,
+                        index=None
+                    )
+                    if choice:
+                        responses[sub] = choice
+                        filled += 1
 
-    responses = {}
-    for domain, strands in domains.items():
-        st.markdown(f"### {domain}")
-        for strand in strands:
-            responses[strand] = st.selectbox(
-                strand, ["Select Rating"] + rating_options, key=strand
-            )
+            reflection = st.text_area("Optional Reflection")
 
-    # --- Submit ---
-    if st.button("Submit Response"):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Progress
+            progress = int((filled / total) * 100)
+            st.progress(progress / 100)
+            st.caption(f"Progress: {filled}/{total} ({progress}%)")
 
-        row = [timestamp, st.session_state.teacher_email,
-               st.session_state.teacher_name, st.session_state.appraiser] + [
-            responses[s] for domain in domains.values() for s in domain
-        ]
+            # Submit
+            if st.button("Submit"):
+                if filled < total:
+                    st.warning("⚠️ Please complete all required sub-strands before submitting.")
+                else:
+                    save_response(name, email, appraiser, responses, reflection)
+                    st.success("🎉 Your self-assessment has been submitted and locked.")
 
-        # ensure headers exist
-        if not responses_ws.row_values(1):
-            headers = ["Timestamp", "Email", "Name", "Appraiser"] + [
-                s for domain in domains.values() for s in domain
-            ]
-            responses_ws.insert_row(headers, 1)
-
-        responses_ws.append_row(row)
-        st.success("✅ Response submitted successfully!")
-
-else:
-    st.warning("👆 Please login with your OIS email to continue.")
