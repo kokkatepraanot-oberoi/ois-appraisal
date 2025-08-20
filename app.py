@@ -1,3 +1,4 @@
+
 # app.py
 import time
 from datetime import datetime
@@ -145,22 +146,23 @@ def with_backoff(fn, *args, **kwargs):
     return fn(*args, **kwargs)
 
 # =========================
-# ONE-TIME SHEETS CONNECTION
+# ONE-TIME SHEETS CONNECTION (cached)
 # =========================
-def connect_sheets():
+@st.cache_resource
+def get_worksheets():
     creds = Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
     client = gspread.authorize(creds)
     try:
         ss = client.open_by_key(SPREADSHEET_ID)
+        resp_ws = ss.worksheet("Responses")
+        users_ws = ss.worksheet("Users")
+        return resp_ws, users_ws
     except Exception as e:
         st.error("⚠️ Could not access Google Sheet. Ensure the service account has **Editor** access and the Sheet ID is correct.")
         st.caption(f"Debug info: {e}")
         st.stop()
-    return ss
 
-SS = connect_sheets()
-RESP_WS = SS.worksheet("Responses")
-USERS_WS = SS.worksheet("Users")
+RESP_WS, USERS_WS = get_worksheets()
 
 # =========================
 # HEADER MANAGEMENT (safe, non-destructive)
@@ -233,7 +235,7 @@ users_df = load_users_once_df()
 # =========================
 # RESPONSES cache (for 'My submission' and Admin)
 # =========================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=180)  # slightly longer to reduce bursts
 def load_responses_df():
     vals = with_backoff(RESP_WS.get_all_values)
     if not vals:
@@ -250,7 +252,7 @@ def user_has_submission(email: str) -> bool:
         return False
     df = load_responses_df()
     return (not df.empty) and ("Email" in df.columns) and (not df[df["Email"] == email.strip().lower()].empty)
-    
+
 # =========================
 # AUTH: Login / Logout
 # =========================
@@ -332,7 +334,6 @@ if i_am_admin:
 
 tab = st.sidebar.radio("Menu", nav_options, index=0)
 
-
 # =========================
 # Page: Self‑Assessment
 # =========================
@@ -392,6 +393,8 @@ if tab == "Self‑Assessment":
 
             try:
                 with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
+                # make new submission visible immediately
+                load_responses_df.clear()
                 st.session_state.submitted = True
                 st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
             except Exception as e:
@@ -404,15 +407,20 @@ if tab == "Self‑Assessment":
 if tab == "My Submission":
     df = load_responses_df()
     my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
+
+    # auto-refresh (handles stale cache after recent submit)
+    if my.empty:
+        load_responses_df.clear()
+        df = load_responses_df()
+        my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
+
     st.subheader("My Submission")
     if my.empty:
         st.info("No submission found yet.")
     else:
-        # show latest by Timestamp (string sort still works if consistent format)
         my_sorted = my.sort_values("Timestamp", ascending=False)
         latest = my_sorted.head(1)
         st.dataframe(latest, use_container_width=True)
-        # download
         csv = my_sorted.to_csv(index=False).encode("utf-8")
         st.download_button("Download my submissions (CSV)", data=csv, file_name="my_self_assessment.csv", mime="text/csv")
 
@@ -432,7 +440,6 @@ if tab == "Admin":
         if df.empty:
             st.info("No responses yet.")
         else:
-            # Basic filters
             c1, c2 = st.columns(2)
             with c1:
                 q_name = st.text_input("Filter by Name contains", "")
@@ -447,7 +454,6 @@ if tab == "Admin":
 
             st.dataframe(view, use_container_width=True, height=480)
 
-            # Export
             csv_all = view.to_csv(index=False).encode("utf-8")
             st.download_button("⬇️ Download filtered (CSV)", data=csv_all, file_name="responses_filtered.csv", mime="text/csv")
 
