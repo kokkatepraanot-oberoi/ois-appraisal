@@ -3,84 +3,92 @@ import gspread
 from google.oauth2.service_account import Credentials
 import datetime
 
-# ==============================
-# Google Sheets Setup
-# ==============================
+# ===== Google Sheets Setup =====
 SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
-RESPONSES_SHEET = "Responses"
-USERS_SHEET = "Users"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-scope = ["https://www.googleapis.com/auth/spreadsheets",
-         "https://www.googleapis.com/auth/drive"]
+credentials = Credentials.from_service_account_file("service_account.json", scopes=SCOPES)
+client = gspread.authorize(credentials)
 
-# Load credentials
-creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-client = gspread.authorize(creds)
+responses_ws = client.open_by_key(SPREADSHEET_ID).worksheet("Responses")
+users_ws = client.open_by_key(SPREADSHEET_ID).worksheet("Users")
 
-responses_ws = client.open_by_key(SPREADSHEET_ID).worksheet(RESPONSES_SHEET)
-users_ws = client.open_by_key(SPREADSHEET_ID).worksheet(USERS_SHEET)
-
-# ==============================
-# Load Users into dictionary
-# ==============================
+# ===== Load Users =====
 users_data = users_ws.get_all_records()
-email_to_user = {u["Email"].strip().lower(): u for u in users_data}
+user_lookup = {u["Email"]: u for u in users_data}
 
-# ==============================
-# Domain A (for testing)
-# ==============================
-DOMAIN_A = {
-    "title": "Planning and Preparation for Learning",
-    "subs": [
-        "A1. Expertise",
-        "A2. Goals",
-        "A3. Units",
-        "A4. Assessments",
-        "A5. Anticipation"
-    ]
+# ===== Admin Accounts =====
+ADMIN_USERS = {
+    "Roma": {"password": "roma123", "role": "Appraiser"},
+    "Praanot": {"password": "praanot123", "role": "Appraiser"},
+    "Kirandeep": {"password": "kirandeep123", "role": "Appraiser"},
+    "Manjula": {"password": "manjula123", "role": "Appraiser"},
+    "Paul": {"password": "paul123", "role": "Head of School"},
 }
 
-RATINGS = ["Highly Effective", "Effective", "Improvement Necessary", "Does Not Meet Standards"]
+# ===== Strand Headers =====
+HEADERS = [
+    "Timestamp", "Email", "Name", "Appraiser",
+    "A1 Expertise", "A2 Goals", "A3 Units", "A4 Assessments", "A5 Anticipation"
+]
 
-# ==============================
-# Streamlit UI
-# ==============================
-st.title("OIS Self-Assessment Form (Test)")
+# ===== Ensure Headers Exist =====
+if not responses_ws.row_values(1):
+    responses_ws.append_row(HEADERS)
 
-email = st.text_input("Enter your school email").strip().lower()
+# ===== Streamlit App =====
+st.sidebar.title("OIS Appraisal Portal")
+menu = st.sidebar.radio("Navigate", ["Self-Assessment", "Admin Dashboard"])
 
-name, appraiser = "", ""
-if email in email_to_user:
-    user = email_to_user[email]
-    name = user.get("Name", "")
-    appraiser = user.get("Appraiser", "")
-    st.success(f"Welcome {name}! Your appraiser is **{appraiser}**.")
-else:
-    if email:
-        st.warning("Email not found in Users sheet. Please check your spelling.")
+# ---------- SELF-ASSESSMENT ----------
+if menu == "Self-Assessment":
+    st.header("Self-Assessment Form")
 
-responses = {}
+    # Teacher login (simplified: via email only)
+    email = st.text_input("Enter your school email:")
+    if email in user_lookup:
+        name = user_lookup[email]["Name"]
+        appraiser = user_lookup[email].get("Appraiser", "Not Assigned")
+        st.success(f"Welcome {name}! Your Appraiser is **{appraiser}**")
 
-st.header(f"Domain A: {DOMAIN_A['title']}")
-for sub in DOMAIN_A["subs"]:
-    responses[sub] = st.radio(
-        sub,
-        RATINGS,
-        index=None,   # no default selection
-        horizontal=True
-    )
+        with st.form("self_assessment"):
+            a1 = st.selectbox("A1 Expertise", ["Highly Effective", "Effective", "Improvement Necessary"])
+            a2 = st.selectbox("A2 Goals", ["Highly Effective", "Effective", "Improvement Necessary"])
+            a3 = st.selectbox("A3 Units", ["Highly Effective", "Effective", "Improvement Necessary"])
+            a4 = st.selectbox("A4 Assessments", ["Highly Effective", "Effective", "Improvement Necessary"])
+            a5 = st.selectbox("A5 Anticipation", ["Highly Effective", "Effective", "Improvement Necessary"])
 
-if st.button("Submit"):
-    if not email or not name:
-        st.error("Please enter a valid email (must match Users sheet).")
-    else:
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        row = [now, email, name, appraiser] + [responses[sub] if responses[sub] else "" for sub in DOMAIN_A["subs"]]
-        
-        # Write headers only if empty
-        if not responses_ws.get_all_values():
-            headers = ["Timestamp", "Email", "Name", "Appraiser"] + DOMAIN_A["subs"]
-            responses_ws.append_row(headers)
-        
-        responses_ws.append_row(row)
-        st.success("Response submitted successfully!")
+            submitted = st.form_submit_button("Submit")
+            if submitted:
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                row = [timestamp, email, name, appraiser, a1, a2, a3, a4, a5]
+                responses_ws.append_row(row)
+                st.success("✅ Your self-assessment has been recorded!")
+
+    elif email:
+        st.error("Email not found in Users sheet. Please contact admin.")
+
+# ---------- ADMIN DASHBOARD ----------
+elif menu == "Admin Dashboard":
+    st.header("Admin Dashboard")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if username in ADMIN_USERS and ADMIN_USERS[username]["password"] == password:
+            st.success(f"Welcome {username}!")
+
+            all_data = responses_ws.get_all_records()
+
+            if ADMIN_USERS[username]["role"] == "Head of School":
+                st.info("You can view ALL submissions")
+                st.dataframe(all_data)
+
+            else:
+                st.info(f"You can view submissions assigned to **{username}**")
+                my_data = [r for r in all_data if r.get("Appraiser") == username]
+                st.dataframe(my_data)
+
+        else:
+            st.error("Invalid login credentials")
