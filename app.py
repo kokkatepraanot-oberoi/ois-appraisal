@@ -1,94 +1,53 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-import datetime
+import pandas as pd
 
-# ===== Google Sheets Setup =====
-SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
+# ====== CONFIG ======
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
 
-credentials = Credentials.from_service_account_file("service_account.json", scopes=SCOPES)
-client = gspread.authorize(credentials)
+# ====== AUTH ======
+creds = Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"], scopes=SCOPES
+)
+client = gspread.authorize(creds)
 
-responses_ws = client.open_by_key(SPREADSHEET_ID).worksheet("Responses")
-users_ws = client.open_by_key(SPREADSHEET_ID).worksheet("Users")
+# ====== LOAD SHEETS ======
+sheet = client.open_by_key(SPREADSHEET_ID)
 
-# ===== Load Users =====
+# Responses sheet
+responses_ws = sheet.worksheet("Responses")
+
+# Users sheet
+users_ws = sheet.worksheet("Users")
+
+# ====== APP ======
+st.set_page_config(page_title="OIS Appraisal Test", layout="wide")
+
+st.title("📊 OIS Self-Assessment Test App")
+
+# --- Show Users data
+st.subheader("👥 Users Sheet Data")
 users_data = users_ws.get_all_records()
-user_lookup = {u["Email"]: u for u in users_data}
+if users_data:
+    df_users = pd.DataFrame(users_data)
+    st.dataframe(df_users)
+else:
+    st.warning("No data in Users sheet yet.")
 
-# ===== Admin Accounts =====
-ADMIN_USERS = {
-    "Roma": {"password": "roma123", "role": "Appraiser"},
-    "Praanot": {"password": "praanot123", "role": "Appraiser"},
-    "Kirandeep": {"password": "kirandeep123", "role": "Appraiser"},
-    "Manjula": {"password": "manjula123", "role": "Appraiser"},
-    "Paul": {"password": "paul123", "role": "Head of School"},
-}
+# --- Show Responses data
+st.subheader("📝 Responses Sheet Data")
+responses_data = responses_ws.get_all_records()
+if responses_data:
+    df_responses = pd.DataFrame(responses_data)
+    st.dataframe(df_responses)
+else:
+    st.warning("No responses yet.")
 
-# ===== Strand Headers =====
-HEADERS = [
-    "Timestamp", "Email", "Name", "Appraiser",
-    "A1 Expertise", "A2 Goals", "A3 Units", "A4 Assessments", "A5 Anticipation"
-]
-
-# ===== Ensure Headers Exist =====
-if not responses_ws.row_values(1):
-    responses_ws.append_row(HEADERS)
-
-# ===== Streamlit App =====
-st.sidebar.title("OIS Appraisal Portal")
-menu = st.sidebar.radio("Navigate", ["Self-Assessment", "Admin Dashboard"])
-
-# ---------- SELF-ASSESSMENT ----------
-if menu == "Self-Assessment":
-    st.header("Self-Assessment Form")
-
-    # Teacher login (simplified: via email only)
-    email = st.text_input("Enter your school email:")
-    if email in user_lookup:
-        name = user_lookup[email]["Name"]
-        appraiser = user_lookup[email].get("Appraiser", "Not Assigned")
-        st.success(f"Welcome {name}! Your Appraiser is **{appraiser}**")
-
-        with st.form("self_assessment"):
-            a1 = st.selectbox("A1 Expertise", ["Highly Effective", "Effective", "Improvement Necessary"])
-            a2 = st.selectbox("A2 Goals", ["Highly Effective", "Effective", "Improvement Necessary"])
-            a3 = st.selectbox("A3 Units", ["Highly Effective", "Effective", "Improvement Necessary"])
-            a4 = st.selectbox("A4 Assessments", ["Highly Effective", "Effective", "Improvement Necessary"])
-            a5 = st.selectbox("A5 Anticipation", ["Highly Effective", "Effective", "Improvement Necessary"])
-
-            submitted = st.form_submit_button("Submit")
-            if submitted:
-                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                row = [timestamp, email, name, appraiser, a1, a2, a3, a4, a5]
-                responses_ws.append_row(row)
-                st.success("✅ Your self-assessment has been recorded!")
-
-    elif email:
-        st.error("Email not found in Users sheet. Please contact admin.")
-
-# ---------- ADMIN DASHBOARD ----------
-elif menu == "Admin Dashboard":
-    st.header("Admin Dashboard")
-
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        if username in ADMIN_USERS and ADMIN_USERS[username]["password"] == password:
-            st.success(f"Welcome {username}!")
-
-            all_data = responses_ws.get_all_records()
-
-            if ADMIN_USERS[username]["role"] == "Head of School":
-                st.info("You can view ALL submissions")
-                st.dataframe(all_data)
-
-            else:
-                st.info(f"You can view submissions assigned to **{username}**")
-                my_data = [r for r in all_data if r.get("Appraiser") == username]
-                st.dataframe(my_data)
-
-        else:
-            st.error("Invalid login credentials")
+# --- Quick test: add dummy row
+if st.button("➕ Add Dummy Response"):
+    responses_ws.append_row(
+        ["2025-08-20 17:00", "test@oberoi-is.org", "Test Teacher", "Roma", "Effective"]
+    )
+    st.success("Dummy response added! Refresh to see it in the sheet.")
