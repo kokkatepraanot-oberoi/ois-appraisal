@@ -138,10 +138,8 @@ def with_backoff(fn, *args, **kwargs):
             delay *= 2
             last_exc = e
             continue
-    # Exhausted attempts
     if last_exc:
         raise last_exc
-    # Fallback
     return fn(*args, **kwargs)
 
 # =========================
@@ -192,31 +190,73 @@ def ensure_headers_once():
 ensure_headers_once()
 
 # =========================
-# USERS: read ONCE per server process (no per-rerun reads)
+# USERS: read ONCE per server process (auto‑detect headers)
 # =========================
+def _pick_col(candidates: list[str], cols: list[str]):
+    """Return the first column from 'cols' that matches any of 'candidates' case-insensitively."""
+    norm_map = {c.strip().lower(): c for c in cols}
+    for want in candidates:
+        key = want.strip().lower()
+        if key in norm_map:
+            return norm_map[key]
+    # fallback: partial contains
+    for c in cols:
+        cl = c.strip().lower()
+        if any(w in cl for w in candidates):
+            return c
+    return None
+
 @st.cache_resource
 def load_users_once_df():
     """
-    Load a minimal range (fewer read quotas). Assumes headers on first row.
-    Adjust the range if your Users sheet has different columns/positions.
+    Load Users with header auto-detection (no KeyError if sheet uses different header names or order).
+    Looks for columns that map to Email, Name, Appraiser.
     """
-    # Example: A: Email, B: Name, C: Appraiser — change if needed
-    values = with_backoff(USERS_WS.get_values, "A:C")
-    if not values:
+    records = with_backoff(USERS_WS.get_all_records)
+    if not records:
         return pd.DataFrame(columns=["Email", "Name", "Appraiser"])
 
-    header = [c.strip() for c in values[0]]
-    data = values[1:] if len(values) > 1 else []
-    df = pd.DataFrame(data, columns=header)
+    df = pd.DataFrame(records)
+    if df.empty:
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser"])
 
-    # Normalize email
-    if "Email" in df.columns:
-        df["Email"] = df["Email"].astype(str).str.strip().str.lower()
-    if "Name" not in df.columns:
-        df["Name"] = ""
-    if "Appraiser" not in df.columns:
-        df["Appraiser"] = "Not Assigned"
-    return df
+    cols = list(df.columns)
+
+    # Try to find header names (case-insensitive, flexible)
+    email_header = _pick_col(
+        ["email", "school email", "work email", "ois email", "e-mail"],
+        cols,
+    )
+    name_header = _pick_col(
+        ["name", "full name", "teacher name", "staff name"],
+        cols,
+    )
+    appraiser_header = _pick_col(
+        ["appraiser", "line manager", "manager", "appraiser name", "supervisor"],
+        cols,
+    )
+
+    # Build standardized frame
+    out = pd.DataFrame()
+    if email_header:
+        out["Email"] = df[email_header].astype(str).str.strip().str.lower()
+    else:
+        out["Email"] = ""
+        st.warning("Users sheet: could not detect an **Email** column. Expected something like 'Email' or 'School Email'.")
+
+    if name_header:
+        out["Name"] = df[name_header].astype(str).str.strip()
+    else:
+        out["Name"] = ""
+        st.warning("Users sheet: could not detect a **Name** column. Expected something like 'Name' or 'Teacher Name'.")
+
+    if appraiser_header:
+        out["Appraiser"] = df[appraiser_header].astype(str).str.strip().replace({"": "Not Assigned"})
+    else:
+        out["Appraiser"] = "Not Assigned"
+        # Non-blocking; many sheets don't have this initially
+
+    return out
 
 users_df = load_users_once_df()
 
@@ -228,20 +268,32 @@ st.title("🌟 OIS Teacher Self‑Assessment 2025‑26")
 st.sidebar.header("Teacher Login")
 email_input = st.sidebar.text_input("School email (e.g., firstname.lastname@oberoi-is.org)").strip()
 
+# Optional: quick debug of detected headers
+with st.sidebar.expander("Debug: Users headers", expanded=False):
+    if not users_df.empty:
+        st.write(list(users_df.columns))
+    else:
+        st.write("No users loaded (empty sheet or unreadable).")
+
 user_row = None
 if email_input:
     # gentle domain hint (non-blocking)
     if "@" in email_input and not email_input.lower().endswith("@oberoi-is.org"):
         st.sidebar.info("Note: this looks like a non‑OIS address. If that’s intentional, ignore this.")
+
     email_lc = email_input.lower()
-    match = users_df[users_df["Email"] == email_lc] if not users_df.empty else pd.DataFrame()
+    if not users_df.empty and "Email" in users_df.columns:
+        match = users_df[users_df["Email"] == email_lc]
+    else:
+        match = pd.DataFrame()
+
     if not match.empty:
         user_row = match.iloc[0]
         appraiser = user_row.get("Appraiser", "Not Assigned")
         st.sidebar.success(f"Welcome **{user_row.get('Name', '')}**")
         st.sidebar.info(f"Your appraiser: **{appraiser}**")
     else:
-        st.sidebar.error("Email not found in Users sheet.")
+        st.sidebar.error("Email not found in Users sheet (or Email column not detected).")
 
 if user_row is not None:
     st.header("📋 Self‑Assessment")
