@@ -66,7 +66,7 @@ for domain, substrands in domains.items():
         for sub in substrands:
             st.markdown(f"**{sub}**")   
             selection = st.radio(
-                "Select rating:", ratings, key=f"{domain}_{sub}", horizontal=True, index=3
+                "Select rating:", ratings, key=f"{domain}_{sub}", horizontal=True, index=None
             )
             responses[f"{domain.split(':')[0]}_{sub}"] = selection
             if selection:  # always true since default is set
