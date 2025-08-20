@@ -245,6 +245,12 @@ def load_responses_df():
         df["Email"] = df["Email"].astype(str).str.lower()
     return df
 
+def user_has_submission(email: str) -> bool:
+    if not email:
+        return False
+    df = load_responses_df()
+    return (not df.empty) and ("Email" in df.columns) and (not df[df["Email"] == email.strip().lower()].empty)
+    
 # =========================
 # AUTH: Login / Logout
 # =========================
@@ -304,24 +310,36 @@ with st.sidebar.expander("Progress", expanded=True):
     st.progress(done / total_items if total_items else 0.0)
     st.caption(f"{done}/{total_items} sub‑strands completed")
 
-# =========================
 # Main Nav
-# =========================
 st.title("🌟 OIS Teacher Self‑Assessment 2025‑26")
 
 if not st.session_state.auth_email:
     st.info("Please log in from the sidebar to continue.")
     st.stop()
 
-nav_options = ["Self‑Assessment", "My Submission"]
-if is_admin(st.session_state.auth_email):
+already_submitted = user_has_submission(st.session_state.auth_email)
+i_am_admin = is_admin(st.session_state.auth_email)
+
+# If the teacher already submitted, hide the Self‑Assessment tab (admins still see it)
+if already_submitted and not i_am_admin:
+    st.success("Submission on file. You can view it under **My Submission**.")
+    nav_options = ["My Submission"]
+else:
+    nav_options = ["Self‑Assessment", "My Submission"]
+
+if i_am_admin:
     nav_options.append("Admin")
 
 tab = st.sidebar.radio("Menu", nav_options, index=0)
 
+
 # =========================
 # Page: Self‑Assessment
 # =========================
+if already_submitted and not i_am_admin:
+    st.info("You’ve already submitted your self‑assessment. You can view or download it in **My Submission**.")
+    st.stop()
+
 if tab == "Self‑Assessment":
     # Welcome
     me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0] if not users_df.empty else {}
