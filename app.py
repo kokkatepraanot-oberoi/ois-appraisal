@@ -24,7 +24,10 @@ st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
 # =========================
 SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-ENABLE_REFLECTIONS = True  # set to False if you want to hide reflection boxes
+ENABLE_REFLECTIONS = True  # set False to hide reflection boxes
+
+# Optional: list of admin emails (lowercase) in .streamlit/secrets.toml
+ADMINS_FROM_SECRETS = set([e.strip().lower() for e in st.secrets.get("admins", [])])
 
 # =========================
 # DOMAINS & SUB-STRANDS (exact from rubric)
@@ -119,25 +122,15 @@ def with_backoff(fn, *args, **kwargs):
         except HttpError as e:  # googleapiclient
             status = getattr(e, "status_code", None)
             if status in (429, 500, 502, 503, 504):
-                time.sleep(delay)
-                delay *= 2
-                last_exc = e
-                continue
+                time.sleep(delay); delay *= 2; last_exc = e; continue
             raise
         except gspread.exceptions.APIError as e:  # gspread-wrapped
             msg = str(e).lower()
             if any(code in msg for code in ["429", "500", "502", "503", "504"]):
-                time.sleep(delay)
-                delay *= 2
-                last_exc = e
-                continue
+                time.sleep(delay); delay *= 2; last_exc = e; continue
             raise
         except Exception as e:
-            # Non-HTTP transient error: try once more with backoff
-            time.sleep(delay)
-            delay *= 2
-            last_exc = e
-            continue
+            time.sleep(delay); delay *= 2; last_exc = e; continue
     if last_exc:
         raise last_exc
     return fn(*args, **kwargs)
@@ -151,7 +144,7 @@ def connect_sheets():
     try:
         ss = client.open_by_key(SPREADSHEET_ID)
     except Exception as e:
-        st.error("⚠️ Could not access Google Sheet. Please confirm the service account has **Editor** access and the Sheet ID is correct.")
+        st.error("⚠️ Could not access Google Sheet. Ensure the service account has **Editor** access and the Sheet ID is correct.")
         st.caption(f"Debug info: {e}")
         st.stop()
     return ss
@@ -193,151 +186,176 @@ ensure_headers_once()
 # USERS: read ONCE per server process (auto‑detect headers)
 # =========================
 def _pick_col(candidates: list[str], cols: list[str]):
-    """Return the first column from 'cols' that matches any of 'candidates' case-insensitively."""
     norm_map = {c.strip().lower(): c for c in cols}
     for want in candidates:
         key = want.strip().lower()
-        if key in norm_map:
-            return norm_map[key]
-    # fallback: partial contains
+        if key in norm_map: return norm_map[key]
     for c in cols:
         cl = c.strip().lower()
-        if any(w in cl for w in candidates):
-            return c
+        if any(w in cl for w in candidates): return c
     return None
 
 @st.cache_resource
 def load_users_once_df():
-    """
-    Load Users with header auto-detection (no KeyError if sheet uses different header names or order).
-    Looks for columns that map to Email, Name, Appraiser.
-    """
     records = with_backoff(USERS_WS.get_all_records)
     if not records:
-        return pd.DataFrame(columns=["Email", "Name", "Appraiser"])
-
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role"])
     df = pd.DataFrame(records)
     if df.empty:
-        return pd.DataFrame(columns=["Email", "Name", "Appraiser"])
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role"])
 
     cols = list(df.columns)
 
-    # Try to find header names (case-insensitive, flexible)
-    email_header = _pick_col(
-        ["email", "school email", "work email", "ois email", "e-mail"],
-        cols,
-    )
-    name_header = _pick_col(
-        ["name", "full name", "teacher name", "staff name"],
-        cols,
-    )
-    appraiser_header = _pick_col(
-        ["appraiser", "line manager", "manager", "appraiser name", "supervisor"],
-        cols,
-    )
+    email_header = _pick_col(["email","school email","work email","ois email","e-mail"], cols)
+    name_header = _pick_col(["name","full name","teacher name","staff name"], cols)
+    appraiser_header = _pick_col(["appraiser","line manager","manager","appraiser name","supervisor"], cols)
+    role_header = _pick_col(["role","access","admin"], cols)
 
-    # Build standardized frame
     out = pd.DataFrame()
-    if email_header:
-        out["Email"] = df[email_header].astype(str).str.strip().str.lower()
-    else:
-        out["Email"] = ""
-        st.warning("Users sheet: could not detect an **Email** column. Expected something like 'Email' or 'School Email'.")
-
-    if name_header:
-        out["Name"] = df[name_header].astype(str).str.strip()
-    else:
-        out["Name"] = ""
-        st.warning("Users sheet: could not detect a **Name** column. Expected something like 'Name' or 'Teacher Name'.")
-
-    if appraiser_header:
-        out["Appraiser"] = df[appraiser_header].astype(str).str.strip().replace({"": "Not Assigned"})
-    else:
-        out["Appraiser"] = "Not Assigned"
-        # Non-blocking; many sheets don't have this initially
-
+    out["Email"] = df[email_header].astype(str).str.strip().str.lower() if email_header else ""
+    out["Name"] = df[name_header].astype(str).str.strip() if name_header else ""
+    out["Appraiser"] = (df[appraiser_header].astype(str).str.strip().replace({"": "Not Assigned"})
+                        if appraiser_header else "Not Assigned")
+    out["Role"] = df[role_header].astype(str).str.strip().str.lower() if role_header else ""
     return out
 
 users_df = load_users_once_df()
 
 # =========================
-# UI
+# RESPONSES cache (for 'My submission' and Admin)
+# =========================
+@st.cache_data(ttl=60)
+def load_responses_df():
+    vals = with_backoff(RESP_WS.get_all_values)
+    if not vals:
+        return pd.DataFrame()
+    header, rows = vals[0], vals[1:]
+    df = pd.DataFrame(rows, columns=header) if rows else pd.DataFrame(columns=header)
+    # normalize
+    if "Email" in df.columns:
+        df["Email"] = df["Email"].astype(str).str.lower()
+    return df
+
+# =========================
+# AUTH: Login / Logout
+# =========================
+def is_admin(email: str) -> bool:
+    e = (email or "").strip().lower()
+    role_flag = False
+    if not users_df.empty and "Email" in users_df.columns and "Role" in users_df.columns:
+        row = users_df[users_df["Email"] == e]
+        if not row.empty:
+            role_flag = row.iloc[0].get("Role","").lower() in {"admin","administrator"}
+    return (e in ADMINS_FROM_SECRETS) or role_flag
+
+if "auth_email" not in st.session_state:
+    st.session_state.auth_email = ""
+if "auth_name" not in st.session_state:
+    st.session_state.auth_name = ""
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
+
+# ---- Sidebar: Login box ----
+st.sidebar.header("Account")
+if st.session_state.auth_email:
+    st.sidebar.success(f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}**")
+    if st.sidebar.button("Logout"):
+        st.session_state.auth_email = ""
+        st.session_state.auth_name = ""
+        st.session_state.submitted = False
+        st.experimental_rerun()
+else:
+    email_input = st.sidebar.text_input("School email (e.g., firstname.lastname@oberoi-is.org)").strip().lower()
+    login = st.sidebar.button("Login")
+    if login:
+        if email_input and not users_df.empty and "Email" in users_df.columns:
+            match = users_df[users_df["Email"] == email_input]
+            if not match.empty:
+                st.session_state.auth_email = email_input
+                st.session_state.auth_name = match.iloc[0].get("Name","")
+                st.success("Logged in.")
+                st.experimental_rerun()
+            else:
+                st.sidebar.error("Email not found in Users sheet.")
+
+# =========================
+# Sidebar: Live progress (no API calls)
+# =========================
+total_items = sum(len(v) for v in DOMAINS.values())
+def current_progress_from_session() -> int:
+    count = 0
+    for _, items in DOMAINS.items():
+        for code, label in items:
+            if st.session_state.get(f"{code}-{label}"):
+                count += 1
+    return count
+
+with st.sidebar.expander("Progress", expanded=True):
+    done = current_progress_from_session()
+    st.progress(done / total_items if total_items else 0.0)
+    st.caption(f"{done}/{total_items} sub‑strands completed")
+
+# =========================
+# Main Nav
 # =========================
 st.title("🌟 OIS Teacher Self‑Assessment 2025‑26")
 
-st.sidebar.header("Teacher Login")
-email_input = st.sidebar.text_input("School email (e.g., firstname.lastname@oberoi-is.org)").strip()
+if not st.session_state.auth_email:
+    st.info("Please log in from the sidebar to continue.")
+    st.stop()
 
-# Optional: quick debug of detected headers
-with st.sidebar.expander("Debug: Users headers", expanded=False):
-    if not users_df.empty:
-        st.write(list(users_df.columns))
-    else:
-        st.write("No users loaded (empty sheet or unreadable).")
+nav_options = ["Self‑Assessment", "My Submission"]
+if is_admin(st.session_state.auth_email):
+    nav_options.append("Admin")
 
-user_row = None
-if email_input:
-    # gentle domain hint (non-blocking)
-    if "@" in email_input and not email_input.lower().endswith("@oberoi-is.org"):
-        st.sidebar.info("Note: this looks like a non‑OIS address. If that’s intentional, ignore this.")
+tab = st.sidebar.radio("Menu", nav_options, index=0)
 
-    email_lc = email_input.lower()
-    if not users_df.empty and "Email" in users_df.columns:
-        match = users_df[users_df["Email"] == email_lc]
-    else:
-        match = pd.DataFrame()
+# =========================
+# Page: Self‑Assessment
+# =========================
+if tab == "Self‑Assessment":
+    # Welcome
+    me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0] if not users_df.empty else {}
+    appraiser = me.get("Appraiser","Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
+    st.sidebar.info(f"Your appraiser: **{appraiser}**")
 
-    if not match.empty:
-        user_row = match.iloc[0]
-        appraiser = user_row.get("Appraiser", "Not Assigned")
-        st.sidebar.success(f"Welcome **{user_row.get('Name', '')}**")
-        st.sidebar.info(f"Your appraiser: **{appraiser}**")
-    else:
-        st.sidebar.error("Email not found in Users sheet (or Email column not detected).")
+    # Selections are just direct widgets (outside a form) so the sidebar progress updates live.
+    selections = {}
+    reflections = {}
+    for domain, items in DOMAINS.items():
+        with st.expander(domain, expanded=False):
+            for code, label in items:
+                key = f"{code}-{label}"
+                selections[f"{code} {label}"] = st.radio(
+                    f"{code} — {label}",
+                    RATINGS,
+                    index=None,
+                    key=key,
+                ) or ""
+            if ENABLE_REFLECTIONS:
+                reflections[domain] = st.text_area(
+                    f"{domain} Reflection (optional)",
+                    key=f"refl-{domain}",
+                    placeholder="Notes / evidence / next steps (optional)",
+                )
 
-if user_row is not None:
-    st.header("📋 Self‑Assessment")
+    # Submit
+    selected_count = sum(1 for v in selections.values() if v)
+    col1, col2 = st.columns([1,3])
+    with col1:
+        submit = st.button("✅ Submit")
+    with col2:
+        st.write(f"**Progress:** {selected_count}/{total_items} completed")
 
-    selections: dict[str, str] = {}
-    reflections: dict[str, str] = {}
-    total_items = sum(len(v) for v in DOMAINS.values())
-
-    # All inputs live inside a form → no reruns / no API calls until Submit
-    with st.form("self_assessment_form", clear_on_submit=False):
-        for domain, items in DOMAINS.items():
-            with st.expander(domain, expanded=False):
-                for code, label in items:
-                    key = f"{code}-{label}"
-                    selections[f"{code} {label}"] = st.radio(
-                        f"{code} — {label}",
-                        RATINGS,
-                        index=None,
-                        key=key,
-                    ) or ""
-                if ENABLE_REFLECTIONS:
-                    reflections[domain] = st.text_area(
-                        f"{domain} Reflection (optional)",
-                        key=f"refl-{domain}",
-                        placeholder="Notes / evidence / next steps (optional)",
-                    )
-
-        # progress (computed locally; no API)
-        selected_count = sum(1 for v in selections.values() if v)
-        st.progress(selected_count / total_items if total_items else 0.0)
-        st.caption(f"Progress: {selected_count}/{total_items} sub‑strands completed")
-
-        submitted = st.form_submit_button("✅ Submit")
-
-    if submitted:
+    if submit:
         if selected_count < total_items:
             st.warning("Please rate **all** sub‑strands before submitting.")
         else:
-            # Append‑only write (single API call, with backoff)
             row = [
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                email_input,
-                user_row.get("Name", ""),
-                user_row.get("Appraiser", "Not Assigned"),
+                st.session_state.auth_email,
+                st.session_state.auth_name,
+                appraiser,
             ]
             for domain, items in DOMAINS.items():
                 for code, label in items:
@@ -347,9 +365,65 @@ if user_row is not None:
 
             try:
                 with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
-                st.success("🎉 Submitted. Thank you!")
+                st.session_state.submitted = True
+                st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
             except Exception as e:
                 st.error("⚠️ Could not submit right now. Please try again shortly.")
                 st.caption(f"Debug info: {e}")
-else:
-    st.info("Enter your school email in the sidebar to begin.")
+
+# =========================
+# Page: My Submission (teacher view)
+# =========================
+if tab == "My Submission":
+    df = load_responses_df()
+    my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
+    st.subheader("My Submission")
+    if my.empty:
+        st.info("No submission found yet.")
+    else:
+        # show latest by Timestamp (string sort still works if consistent format)
+        my_sorted = my.sort_values("Timestamp", ascending=False)
+        latest = my_sorted.head(1)
+        st.dataframe(latest, use_container_width=True)
+        # download
+        csv = my_sorted.to_csv(index=False).encode("utf-8")
+        st.download_button("Download my submissions (CSV)", data=csv, file_name="my_self_assessment.csv", mime="text/csv")
+
+    if st.button("🔄 Refresh"):
+        load_responses_df.clear()
+        st.experimental_rerun()
+
+# =========================
+# Page: Admin (only for admins)
+# =========================
+if tab == "Admin":
+    if not is_admin(st.session_state.auth_email):
+        st.error("Admin access only.")
+    else:
+        st.subheader("All Responses")
+        df = load_responses_df()
+        if df.empty:
+            st.info("No responses yet.")
+        else:
+            # Basic filters
+            c1, c2 = st.columns(2)
+            with c1:
+                q_name = st.text_input("Filter by Name contains", "")
+            with c2:
+                q_email = st.text_input("Filter by Email contains", "")
+
+            view = df.copy()
+            if q_name:
+                view = view[view["Name"].str.contains(q_name, case=False, na=False)]
+            if q_email:
+                view = view[view["Email"].str.contains(q_email, case=False, na=False)]
+
+            st.dataframe(view, use_container_width=True, height=480)
+
+            # Export
+            csv_all = view.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Download filtered (CSV)", data=csv_all, file_name="responses_filtered.csv", mime="text/csv")
+
+        if st.button("🔄 Refresh"):
+            load_responses_df.clear()
+            st.experimental_rerun()
