@@ -234,17 +234,38 @@ users_df = load_users_once_df()
 
 # =========================
 # RESPONSES cache (for 'My submission' and Admin)
+# Robust header normalization to ensure 'Email' exists
 # =========================
-@st.cache_data(ttl=180)  # slightly longer to reduce bursts
+@st.cache_data(ttl=180)
 def load_responses_df():
     vals = with_backoff(RESP_WS.get_all_values)
     if not vals:
         return pd.DataFrame()
     header, rows = vals[0], vals[1:]
     df = pd.DataFrame(rows, columns=header) if rows else pd.DataFrame(columns=header)
-    # normalize
+
+    # Normalize likely email column to 'Email'
+    if "Email" not in df.columns:
+        email_col = None
+        for c in df.columns:
+            cl = str(c).strip().lower()
+            if cl == "email" or "email" in cl:
+                email_col = c
+                break
+        if email_col:
+            df.rename(columns={email_col: "Email"}, inplace=True)
+
+    # Normalize timestamp casing if needed
+    if "Timestamp" not in df.columns:
+        for c in df.columns:
+            if str(c).strip().lower() == "timestamp":
+                df.rename(columns={c: "Timestamp"}, inplace=True)
+                break
+
+    # Lowercase emails for matching
     if "Email" in df.columns:
-        df["Email"] = df["Email"].astype(str).str.lower()
+        df["Email"] = df["Email"].astype(str).str.strip().str.lower()
+
     return df
 
 def user_has_submission(email: str) -> bool:
@@ -252,6 +273,30 @@ def user_has_submission(email: str) -> bool:
         return False
     df = load_responses_df()
     return (not df.empty) and ("Email" in df.columns) and (not df[df["Email"] == email.strip().lower()].empty)
+
+# Build a row that matches the CURRENT header order to avoid misalignment
+def build_row_aligned(email: str, name: str, appraiser: str, selections: dict, reflections: dict):
+    headers = with_backoff(RESP_WS.row_values, 1)
+    values = {}
+
+    # core fields
+    values["Timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    values["Email"] = email
+    values["Name"] = name
+    values["Appraiser"] = appraiser
+
+    # ratings
+    for domain, items in DOMAINS.items():
+        for code, label in items:
+            values[f"{code} {label}"] = selections.get(f"{code} {label}", "")
+
+        # reflections per domain
+        refl_key = f"{domain} Reflection"
+        if ENABLE_REFLECTIONS:
+            values[refl_key] = reflections.get(domain, "")
+
+    # return row in the exact order of current headers (unknown variations handled)
+    return [values.get(h, "") for h in headers]
 
 # =========================
 # AUTH: Login / Logout
@@ -379,19 +424,14 @@ if tab == "Self‑Assessment":
         if selected_count < total_items:
             st.warning("Please rate **all** sub‑strands before submitting.")
         else:
-            row = [
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                st.session_state.auth_email,
-                st.session_state.auth_name,
-                appraiser,
-            ]
-            for domain, items in DOMAINS.items():
-                for code, label in items:
-                    row.append(selections[f"{code} {label}"])
-                if ENABLE_REFLECTIONS:
-                    row.append(reflections.get(domain, ""))
-
             try:
+                row = build_row_aligned(
+                    email=st.session_state.auth_email,
+                    name=st.session_state.auth_name,
+                    appraiser=appraiser,
+                    selections=selections,
+                    reflections=reflections,
+                )
                 with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
                 # make new submission visible immediately
                 load_responses_df.clear()
@@ -406,19 +446,26 @@ if tab == "Self‑Assessment":
 # =========================
 if tab == "My Submission":
     df = load_responses_df()
-    my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
+
+    my = pd.DataFrame()
+    if not df.empty and "Email" in df.columns:
+        me = st.session_state.auth_email.strip().lower()
+        series = df["Email"].astype(str).str.strip().str.lower()
+        my = df[series == me]
 
     # auto-refresh (handles stale cache after recent submit)
     if my.empty:
         load_responses_df.clear()
         df = load_responses_df()
-        my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
+        if "Email" in df.columns:
+            series = df["Email"].astype(str).str.strip().str.lower()
+            my = df[series == me]
 
     st.subheader("My Submission")
     if my.empty:
         st.info("No submission found yet.")
     else:
-        my_sorted = my.sort_values("Timestamp", ascending=False)
+        my_sorted = my.sort_values("Timestamp", ascending=False) if "Timestamp" in my.columns else my
         latest = my_sorted.head(1)
         st.dataframe(latest, use_container_width=True)
         csv = my_sorted.to_csv(index=False).encode("utf-8")
@@ -447,10 +494,11 @@ if tab == "Admin":
                 q_email = st.text_input("Filter by Email contains", "")
 
             view = df.copy()
-            if q_name:
-                view = view[view["Name"].str.contains(q_name, case=False, na=False)]
-            if q_email:
-                view = view[view["Email"].str.contains(q_email, case=False, na=False)]
+            if "Name" in view.columns and q_name:
+                view = view[view["Name"]].astype(str)
+                view = df[df["Name"].str.contains(q_name, case=False, na=False)]
+            if "Email" in view.columns and q_email:
+                view = df[df["Email"].str.contains(q_email, case=False, na=False)]
 
             st.dataframe(view, use_container_width=True, height=480)
 
