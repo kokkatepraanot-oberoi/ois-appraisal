@@ -10,6 +10,23 @@ from io import BytesIO
 # --------------------------
 @st.cache_resource
 def connect_to_gsheet():
+    scope = ["https://spreadsheets.google.com/feeds",
+             "https://www.googleapis.com/auth/drive"]
+    try:
+        from google.oauth2 import service_account
+        creds = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"], scopes=scope
+        )
+    except KeyError:
+        st.error("⚠️ Missing [gcp_service_account] in Streamlit secrets. Please set it in your app settings.")
+        st.stop()
+    except Exception as e:
+        st.error(f"⚠️ Failed to load service account credentials: {e}")
+        st.stop()
+
+    client = gspread.authorize(creds)
+    sh = client.open_by_key(SPREADSHEET_ID)
+    return sh
     scope = ["https://www.googleapis.com/auth/spreadsheets"]
     creds = Credentials.from_service_account_info(
         st.secrets["gcp_service_account"], scopes=scope
