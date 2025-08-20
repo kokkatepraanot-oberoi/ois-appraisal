@@ -9,7 +9,11 @@ from fpdf import FPDF
 # GOOGLE SHEETS SETUP
 # --------------------
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("google.json", scope)
+import json
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    json.loads(st.secrets["google"]), scope
+)
+
 client = gspread.authorize(creds)
 
 SPREADSHEET_ID = "1kqcfmMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
