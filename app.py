@@ -1,137 +1,141 @@
 import streamlit as st
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
+from google.oauth2.service_account import Credentials
+import pandas as pd
+import datetime
 
-st.set_page_config(page_title="OIS Teacher Self-Assessment 2025-26", layout="wide")
+# --- Google Sheets Setup ---
+SHEET_NAME = "OIS Self Assessment Responses 2025-26"
+RESPONSES_TAB = "Responses"
+USERS_TAB = "Users"
 
-# ---- Google Sheets Setup ----
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=SCOPES)
 client = gspread.authorize(creds)
 
-SHEET_NAME = "OIS Self Assessment Responses 2025-26"
-sheet = client.open(SHEET_NAME).worksheet("Responses")
+sheet = client.open(SHEET_NAME)
+responses_ws = sheet.worksheet(RESPONSES_TAB)
+users_ws = sheet.worksheet(USERS_TAB)
 
-# ---- Login ----
-st.sidebar.header("Login")
-user_email = st.sidebar.text_input("Enter your school email (@oberoi-is.org):")
+# Load data
+users_df = pd.DataFrame(users_ws.get_all_records())
+responses_df = pd.DataFrame(responses_ws.get_all_records())
 
-if not user_email:
-    st.warning("Please enter your email to continue")
-    st.stop()
-
-if not user_email.endswith("@oberoi-is.org"):
-    st.error("❌ Please use your official @oberoi-is.org email address")
-    st.stop()
-
-st.success(f"Welcome {user_email}!")
-
-ratings = ["Highly Effective", "Effective", "Improvement Necessary", "Does Not Meet Standards"]
-
-# ---- Domain structure ----
+# --- Define Sub-strands ---
 domains = {
-    "A: Planning & Preparation": [
-        "Expertise","Goals","Units","Assessments","Anticipation",
-        "Lessons","Materials","Differentiation","Environment"
-    ],
-    "B: Classroom Management": [
-        "Expectations","Relationships","Social Emotional","Routines",
-        "Responsibility","Repertoire","Prevention","Incentives"
-    ],
-    "C: Delivery of Instruction": [
-        "Expectations","Mindset","Framing","Connections","Clarity",
-        "Repertoire","Engagement","Differentiation","Nimbleness"
-    ],
-    "D: Monitoring, Assessment & Follow-Up": [
-        "Criteria","Diagnosis","Goals","Feedback","Recognition",
-        "Analysis","Tenacity","Support","Reflection"
-    ],
-    "E: Family & Community Outreach": [
-        "Respect","Belief","Expectations","Communication","Involving",
-        "Responsiveness","Reporting","Outreach","Resources"
-    ],
-    "F: Professional Responsibility": [
-        "Language","Reliability","Professionalism","Judgement",
-        "Teamwork","Leadership","Openness","Collaboration","Growth"
-    ]
+    "Domain A: Planning": ["Expertise", "Curriculum", "Assessment", "Growth"],
+    "Domain B: Teaching": ["Instruction", "Engagement", "Differentiation", "Feedback"],
+    "Domain C: Learning": ["Environment", "Support", "Inquiry", "Growth"],
+    "Domain D: Professionalism": ["Ethics", "Collaboration", "Leadership", "Reflection"],
+    "Domain E: Contribution": ["Community", "Innovation", "Service"],
+    "Domain F: Growth": ["Development", "Adaptability", "Lifelong Learning"]
 }
 
-# ---- Progress Tracking ----
-total_substrands = sum(len(v) for v in domains.values())
+choices = ["Highly Effective", "Effective", "Improvement Necessary", "Does Not Meet Standards"]
 
-def count_completed():
-    count = 0
-    for domain, substrands in domains.items():
-        for sub in substrands:
-            key = f"{domain}_{sub}"
-            if key in st.session_state and st.session_state[key] is not None:
-                count += 1
-    return count
+# --- Ensure Headers in Responses sheet ---
+expected_headers = ["Timestamp", "Email", "Name"] + [
+    f"{domain} - {strand}" for domain, strands in domains.items() for strand in strands
+]
 
-# ---- Form ----
-for domain, substrands in domains.items():
-    with st.expander(domain, expanded=False):
-        st.markdown(f"## {domain}")  
-        for sub in substrands:
-            st.markdown(f"**{sub}**")   
-            st.radio(
-                "Select rating:",
-                ratings,
-                index=None,  # no default
-                key=f"{domain}_{sub}",
-                horizontal=True
-            )
-        # Optional reflection
-        st.text_area(
-            f"{domain} Reflection (optional)",
-            key=f"{domain}_reflection"
-        )
+existing_headers = responses_ws.row_values(1)
+if not existing_headers or existing_headers != expected_headers:
+    responses_ws.clear()
+    responses_ws.insert_row(expected_headers, 1)
 
-# ---- Overall reflection ----
-st.markdown("## Overall Reflection")
-st.text_area(
-    "Summarize key strengths, growth areas, and initial goal ideas (optional).",
-    key="overall_reflection"
-)
+# --- App Mode Switcher ---
+mode = st.sidebar.radio("Choose Mode:", ["Self Assessment", "Admin Dashboard"])
 
-# ---- Progress Bar ----
-completed_count = count_completed()
-progress = completed_count / total_substrands
-st.sidebar.markdown("### Progress")
-st.sidebar.progress(progress)
-st.sidebar.write(f"{completed_count}/{total_substrands} sub-strands completed ({progress*100:.1f}%)")
+# ---------------- SELF ASSESSMENT ---------------- #
+if mode == "Self Assessment":
+    st.title("OIS Teacher Self Assessment")
 
-# ---- Submit ----
-completed_count = count_completed()
+    email = st.text_input("Enter your school email address:")
+    ratings = {}
 
-if completed_count < total_substrands:
-    st.warning("⚠️ Please complete all sub-strands before submitting.")
-    st.button("Submit Self-Assessment", disabled=True)
-else:
-    if st.button("Submit Self-Assessment"):
-        try:
-            responses = {
-                "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "User": user_email
-            }
+    progress_total = sum(len(s) for s in domains.values())
+    completed = 0
 
-            # Collect all answers
-            for domain, substrands in domains.items():
-                for sub in substrands:
-                    key = f"{domain}_{sub}"
-                    responses[f"{domain.split(':')[0]}_{sub}"] = st.session_state.get(key, "")
-                responses[f"{domain.split(':')[0]}_Reflection"] = st.session_state.get(f"{domain}_reflection", "")
+    if email:
+        st.write(f"Welcome: **{email}**")
 
-            responses["Overall_Reflection"] = st.session_state.get("overall_reflection", "")
+        for domain, strands in domains.items():
+            st.header(domain)
+            for strand in strands:
+                rating = st.radio(
+                    f"{strand}",
+                    choices,
+                    index=None,  # no default selection
+                    key=f"{domain}_{strand}"
+                )
+                ratings[f"{domain} - {strand}"] = rating
+                if rating:
+                    completed += 1
 
-            # Append row in same column order each time
-            if len(sheet.get_all_values()) == 0:
-                sheet.append_row(list(responses.keys()))
-            sheet.append_row(list(responses.values()))
+        # Progress bar
+        st.subheader("Progress")
+        st.progress(completed / progress_total)
+        st.write(f"{completed}/{progress_total} sub-strands completed ({(completed/progress_total)*100:.1f}%)")
 
-            st.success("✅ Your self-assessment has been submitted successfully!")
+        if st.button("Submit"):
+            email_to_name = {row["Email"].strip().lower(): row["Name"] for _, row in users_df.iterrows()}
+            name = email_to_name.get(email.strip().lower(), "Unknown")
 
-        except Exception as e:
-            st.error(f"⚠️ Could not save to Google Sheets: {e}")
+            row = [
+                datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                email,
+                name
+            ] + [ratings[col] if ratings[col] else "" for col in expected_headers[3:]]
+            responses_ws.append_row(row)
+            st.success("✅ Your response has been recorded!")
 
+# ---------------- ADMIN DASHBOARD ---------------- #
+elif mode == "Admin Dashboard":
+    st.title("OIS Self Assessment - Admin Dashboard")
+
+    st.subheader("🔑 Admin Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if username and password:
+        admins = st.secrets["admins"]  # stored securely in secrets.toml
+        if username in admins and password == admins[username]:
+            st.success(f"✅ Welcome {username}")
+
+            # --- Super Admin (Paul) sees ALL teachers ---
+            if username.lower() == "paul":
+                assigned_teachers = users_df
+                st.info("Super Admin Access: Viewing ALL teachers")
+            else:
+                assigned_teachers = users_df[users_df["Appraiser"].str.lower() == username.lower()]
+
+            if assigned_teachers.empty:
+                st.warning("⚠️ No teachers assigned yet.")
+            else:
+                teacher = st.selectbox("Select a teacher:", assigned_teachers["Name"])
+
+                if teacher:
+                    teacher_email = assigned_teachers[assigned_teachers["Name"] == teacher]["Email"].values[0]
+                    teacher_responses = responses_df[responses_df["Email"].str.lower() == teacher_email.lower()]
+
+                    if teacher_responses.empty:
+                        st.info("No self-assessment submitted yet.")
+                    else:
+                        st.subheader(f"📊 Results for {teacher}")
+                        st.dataframe(teacher_responses)
+
+                        # Quick summary
+                        st.subheader("Summary of Ratings")
+                        summary = teacher_responses.iloc[:, 3:].T.value_counts().reset_index()
+                        summary.columns = ["Rating", "Count"]
+                        st.write(summary)
+
+                        # Download button
+                        st.download_button(
+                            "⬇️ Download Teacher Report",
+                            teacher_responses.to_csv(index=False).encode("utf-8"),
+                            f"{teacher}_self_assessment.csv",
+                            "text/csv"
+                        )
+        else:
+            st.error("❌ Invalid username or password")
