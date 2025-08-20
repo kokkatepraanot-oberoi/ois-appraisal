@@ -15,6 +15,15 @@ except Exception:  # pragma: no cover
         pass
 
 # =========================
+# RERUN helper (Streamlit API changed)
+# =========================
+def _rerun():
+    try:
+        st.rerun()  # Streamlit >=1.32
+    except AttributeError:
+        st.experimental_rerun()  # Older versions
+
+# =========================
 # UI CONFIG (must be first)
 # =========================
 st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
@@ -263,7 +272,7 @@ if st.session_state.auth_email:
         st.session_state.auth_email = ""
         st.session_state.auth_name = ""
         st.session_state.submitted = False
-        st.experimental_rerun()
+        _rerun()
 else:
     email_input = st.sidebar.text_input("School email (e.g., firstname.lastname@oberoi-is.org)").strip().lower()
     login = st.sidebar.button("Login")
@@ -274,7 +283,7 @@ else:
                 st.session_state.auth_email = email_input
                 st.session_state.auth_name = match.iloc[0].get("Name","")
                 st.success("Logged in.")
-                st.experimental_rerun()
+                _rerun()
             else:
                 st.sidebar.error("Email not found in Users sheet.")
 
@@ -391,7 +400,7 @@ if tab == "My Submission":
 
     if st.button("🔄 Refresh"):
         load_responses_df.clear()
-        st.experimental_rerun()
+        _rerun()
 
 # =========================
 # Page: Admin (only for admins)
@@ -426,4 +435,4 @@ if tab == "Admin":
 
         if st.button("🔄 Refresh"):
             load_responses_df.clear()
-            st.experimental_rerun()
+            _rerun()
