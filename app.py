@@ -460,3 +460,31 @@ if tab == "Admin":
         if st.button("🔄 Refresh"):
             load_responses_df.clear()
             _rerun()
+
+# ======================
+# Admin Dashboard Tab
+# ======================
+elif selected_tab == "Admin Dashboard":
+    st.header("📊 Admin Dashboard")
+    try:
+        responses_sheet = SHEET.worksheet(RESPONSES_SHEET_NAME)
+        responses_data = responses_sheet.get_all_records()
+        if responses_data:
+            import pandas as pd
+            df = pd.DataFrame(responses_data)
+
+            # Teacher filter
+            teacher_list = sorted(df["user_email"].unique())
+            teacher_filter = st.selectbox("Filter by Teacher", ["All"] + teacher_list)
+            if teacher_filter != "All":
+                df = df[df["user_email"] == teacher_filter]
+
+            st.dataframe(df)
+
+            # Download button
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button("Download CSV", csv, "responses.csv", "text/csv")
+        else:
+            st.info("No responses yet.")
+    except Exception as e:
+        st.error(f"Error loading responses: {e}")
