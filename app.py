@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
@@ -9,26 +10,11 @@ import pandas as pd
 # =========================
 SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-ENABLE_REFLECTIONS = True  # set False if you want to hide reflection boxes
-
-# Authenticate via Streamlit Secrets
-creds = Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
-client = gspread.authorize(creds)
-
-# Safer open with clear error
-try:
-    ss = client.open_by_key(SPREADSHEET_ID)
-except Exception as e:
-    st.error("⚠️ Could not access Google Sheet. Please confirm the service account has **Editor** access.")
-    st.caption(f"Debug info: {e}")
-    st.stop()
-
-RESP_WS = ss.worksheet("Responses")
-USERS_WS = ss.worksheet("Users")
+ENABLE_REFLECTIONS = True  # set to False if you want to hide reflection boxes
 
 # =========================
-# DOMAINS & SUB-STRANDS (exact from your rubric)
-# Each sub-strand is (code, short label)
+# DOMAINS & SUB-STRANDS (exact from rubric)
+# code and short label -> "A1 Expertise" etc. are used as sheet headers
 # =========================
 DOMAINS = {
     "A: Planning and Preparation for Learning": [
@@ -98,7 +84,7 @@ DOMAINS = {
     ],
 }
 
-# Ratings (exact rubric wording)
+# Rating scale (exact rubric wording)
 RATINGS = [
     "Highly Effective",
     "Effective",
@@ -107,20 +93,40 @@ RATINGS = [
 ]
 
 # =========================
-# CACHING (quota-friendly)
+# ONE-TIME SHEETS CONNECTION
 # =========================
-@st.cache_data(ttl=180)  # 3 minutes
-def load_users():
+def connect_sheets():
+    creds = Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
+    client = gspread.authorize(creds)
+    try:
+        ss = client.open_by_key(SPREADSHEET_ID)
+    except Exception as e:
+        st.error("⚠️ Could not access Google Sheet. Please confirm the service account has **Editor** access.")
+        st.caption(f"Debug info: {e}")
+        st.stop()
+    return ss
+
+SS = connect_sheets()
+RESP_WS = SS.worksheet("Responses")
+USERS_WS = SS.worksheet("Users")
+
+# =========================
+# CACHING (quota‑friendly)
+# =========================
+@st.cache_data(ttl=300)  # cache Users for 5 minutes shared by all users
+def load_users_cached():
     return USERS_WS.get_all_records()
 
-@st.cache_data(ttl=180)
-def load_admin_view():
+# Optional: cached admin data view (if you add an admin page later)
+@st.cache_data(ttl=120)
+def load_responses_cached():
     return RESP_WS.get_all_records()
 
 # =========================
-# SHEET HEADER MANAGEMENT
+# HEADERS (done once per app lifetime)
 # =========================
-def ensure_headers():
+@st.cache_resource
+def ensure_headers_once():
     expected = ["Timestamp", "Email", "Name", "Appraiser"]
     for domain, items in DOMAINS.items():
         for code, label in items:
@@ -130,16 +136,20 @@ def ensure_headers():
     current = RESP_WS.row_values(1)
     if current != expected:
         if current:
-            RESP_WS.delete_rows(1)  # replace mismatched header row
+            RESP_WS.delete_rows(1)
         RESP_WS.insert_row(expected, 1)
+    return True
+
+ensure_headers_once()
 
 # =========================
 # UI
 # =========================
-st.set_page_config(page_title="OIS Teacher Self-Assessment", layout="wide")
+st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
 st.title("🌟 OIS Teacher Self‑Assessment 2025‑26")
 
-users_df = pd.DataFrame(load_users())
+users_df = pd.DataFrame(load_users_cached())
+
 st.sidebar.header("Teacher Login")
 email = st.sidebar.text_input("School email").strip()
 
@@ -148,18 +158,17 @@ if email:
     match = users_df[users_df["Email"].str.lower() == email.lower()]
     if not match.empty:
         user_row = match.iloc[0]
-        st.sidebar.success(f"Welcome **{user_row['Name']}**")
         appraiser = user_row.get("Appraiser", "Not Assigned")
+        st.sidebar.success(f"Welcome **{user_row['Name']}**")
         st.sidebar.info(f"Your appraiser: **{appraiser}**")
     else:
-        st.sidebar.error("Email not found in the Users sheet.")
+        st.sidebar.error("Email not found in Users sheet.")
 
 if user_row is not None:
     st.header("📋 Self‑Assessment")
     selections = {}
     reflections = {}
 
-    # count for progress
     total_items = sum(len(v) for v in DOMAINS.values())
     selected_count = 0
 
@@ -170,8 +179,7 @@ if user_row is not None:
                 choice = st.radio(
                     f"{code} — {label}",
                     RATINGS,
-                    index=None,  # no default
-                    horizontal=False,
+                    index=None,  # no default selection
                     key=key,
                 )
                 if choice:
@@ -184,22 +192,20 @@ if user_row is not None:
                     placeholder="Notes / evidence / next steps (optional)",
                 )
 
-    # simple progress
     st.progress(selected_count / total_items if total_items else 0.0)
     st.caption(f"Progress: {selected_count}/{total_items} sub‑strands completed")
 
     if st.button("✅ Submit"):
         if selected_count < total_items:
-            st.warning("Please rate all sub‑strands before submitting.")
+            st.warning("Please rate **all** sub‑strands before submitting.")
         else:
-            ensure_headers()
+            # Append‑only write (no re‑read)
             row = [
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 email,
                 user_row["Name"],
                 user_row.get("Appraiser", "Not Assigned"),
             ]
-            # ratings in A1..F9 order
             for domain, items in DOMAINS.items():
                 for code, label in items:
                     row.append(selections[f"{code} {label}"])
@@ -207,46 +213,8 @@ if user_row is not None:
                     row.append(reflections.get(domain, ""))
 
             try:
-                RESP_WS.append_row(row)
+                RESP_WS.append_row(row, value_input_option="USER_ENTERED")
                 st.success("🎉 Submitted. Thank you!")
             except Exception as e:
                 st.error("⚠️ Could not submit right now. Please try again shortly.")
                 st.caption(f"Debug info: {e}")
-
-# =========================
-# ADMIN (optional, cached view)
-# =========================
-st.sidebar.divider()
-st.sidebar.subheader("Admin Login")
-admin_user = st.sidebar.text_input("Admin username")
-admin_pass = st.sidebar.text_input("Password", type="password")
-
-ADMINS = {
-    "Roma": "ms123",
-    "Praanot": "ms456",
-    "Kirandeep": "hs123",
-    "Manjula": "hs456",
-    "Paul": "head123",  # Head of School (can view all)
-}
-
-if st.sidebar.button("Login as Admin"):
-    if admin_user in ADMINS and admin_pass == ADMINS[admin_user]:
-        st.success(f"Admin '{admin_user}' logged in")
-        st.header(f"📊 Admin Dashboard — {admin_user}")
-
-        try:
-            data = load_admin_view()
-            df = pd.DataFrame(data)
-        except Exception as e:
-            st.error("⚠️ Could not load responses.")
-            st.caption(f"Debug info: {e}")
-            st.stop()
-
-        if df.empty:
-            st.info("No responses yet.")
-        else:
-            if admin_user != "Paul":
-                df = df[df["Appraiser"] == admin_user]
-            st.dataframe(df, use_container_width=True)
-    else:
-        st.sidebar.error("Invalid admin credentials")
