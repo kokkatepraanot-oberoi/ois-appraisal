@@ -9,9 +9,8 @@ from fpdf import FPDF
 # GOOGLE SHEETS SETUP
 # --------------------
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-import json
 creds = ServiceAccountCredentials.from_json_keyfile_dict(
-    json.loads(st.secrets["google"]), scope
+    st.secrets["google"], scope
 )
 
 client = gspread.authorize(creds)
