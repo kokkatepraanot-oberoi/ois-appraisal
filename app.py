@@ -15,7 +15,7 @@ def connect_to_gsheet():
     try:
         from google.oauth2 import service_account
         creds = service_account.Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"], scopes=scope
+            st.secrets["google"], scopes=scope
         )
     except KeyError:
         st.error("⚠️ Missing [gcp_service_account] in Streamlit secrets. Please set it in your app settings.")
