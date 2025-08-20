@@ -11,7 +11,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service
 client = gspread.authorize(creds)
 
 SHEET_NAME = "OIS Self Assessment Responses 2025-26"
-sheet = client.open(SHEET_NAME).sheet1
+sheet = client.open(SHEET_NAME).worksheet("Responses")
 
 # ---- Login ----
 st.sidebar.header("Login")
