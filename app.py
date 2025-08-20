@@ -6,6 +6,7 @@ import datetime
 
 # --- Google Sheets Setup ---
 SHEET_NAME = "OIS Self Assessment Responses 2025-26"
+SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
 RESPONSES_TAB = "Responses"
 USERS_TAB = "Users"
 
@@ -13,7 +14,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=SCOPES)
 client = gspread.authorize(creds)
 
-sheet = client.open(SHEET_NAME)
+sheet = client.open_by_key(SPREADSHEET_ID)
 responses_ws = sheet.worksheet(RESPONSES_TAB)
 users_ws = sheet.worksheet(USERS_TAB)
 
