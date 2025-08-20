@@ -12,10 +12,19 @@ SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
 credentials = Credentials.from_service_account_info(
     st.secrets["google"], scopes=SCOPES
 )
+
+
 client = gspread.authorize(credentials)
 
 # Open sheets
-spreadsheet = client.open_by_key(SPREADSHEET_ID)
+# 🔒 Safer opening with error message
+try:
+    spreadsheet = client.open_by_key(SPREADSHEET_ID)
+except Exception as e:
+    st.error("⚠️ Could not access Google Sheet. Please confirm the service account has Editor access.")
+    st.write(f"Debug info: {str(e)}")  # (optional) shows what went wrong
+    st.stop()
+
 responses_ws = spreadsheet.worksheet("Responses")
 users_ws = spreadsheet.worksheet("Users")
 
