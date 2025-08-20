@@ -16,7 +16,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(
 client = gspread.authorize(creds)
 
 SPREADSHEET_ID = "1kqcfmMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
-sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+sheet = client.open_by_key(st.secrets["SPREADSHEET_ID"]).sheet1
 
 # --------------------
 # STREAMLIT UI SETUP
