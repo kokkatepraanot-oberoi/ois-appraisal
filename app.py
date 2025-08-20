@@ -162,20 +162,6 @@ def get_worksheets():
         st.caption(f"Debug info: {e}")
         st.stop()
 
-# --- Admin View ---
-if user_email.lower() in ADMINS_FROM_SECRETS:
-    st.subheader("📊 Admin View: Submissions for Your Teachers")
-    try:
-        sheet = connect_to_gsheet()
-        worksheet = sheet.worksheet("Responses")
-        data = worksheet.get_all_records()
-        import pandas as pd
-        df = pd.DataFrame(data)
-        st.dataframe(df)
-    except Exception as e:
-        st.error(f"⚠️ Could not load admin submissions: {e}")
-
-
 RESP_WS, USERS_WS = get_worksheets()
 
 # =========================
@@ -333,20 +319,6 @@ if not st.session_state.auth_email:
     st.info("Please log in from the sidebar to continue.")
     st.stop()
 
-# --- Admin View ---
-if user_email.lower() in ADMINS_FROM_SECRETS:
-    st.subheader("📊 Admin View: Submissions for Your Teachers")
-    try:
-        sheet = connect_to_gsheet()
-        worksheet = sheet.worksheet("Responses")
-        data = worksheet.get_all_records()
-        import pandas as pd
-        df = pd.DataFrame(data)
-        st.dataframe(df)
-    except Exception as e:
-        st.error(f"⚠️ Could not load admin submissions: {e}")
-
-
 already_submitted = user_has_submission(st.session_state.auth_email)
 i_am_admin = is_admin(st.session_state.auth_email)
 
@@ -368,20 +340,6 @@ tab = st.sidebar.radio("Menu", nav_options, index=0)
 if already_submitted and not i_am_admin:
     st.info("You’ve already submitted your self‑assessment. You can view or download it in **My Submission**.")
     st.stop()
-
-# --- Admin View ---
-if user_email.lower() in ADMINS_FROM_SECRETS:
-    st.subheader("📊 Admin View: Submissions for Your Teachers")
-    try:
-        sheet = connect_to_gsheet()
-        worksheet = sheet.worksheet("Responses")
-        data = worksheet.get_all_records()
-        import pandas as pd
-        df = pd.DataFrame(data)
-        st.dataframe(df)
-    except Exception as e:
-        st.error(f"⚠️ Could not load admin submissions: {e}")
-
 
 if tab == "Self‑Assessment":
     # Welcome
