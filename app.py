@@ -21,6 +21,10 @@ if not user_email:
     st.warning("Please enter your email to continue")
     st.stop()
 
+if not user_email.endswith("@oberoi-is.org"):
+    st.error("❌ Please use your official @oberoi-is.org email address")
+    st.stop()
+
 st.success(f"Welcome {user_email}!")
 
 ratings = ["Highly Effective", "Effective", "Improvement Necessary", "Does Not Meet Standards"]
@@ -53,34 +57,46 @@ domains = {
     ]
 }
 
-responses = {"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "User": user_email}
-
 # ---- Progress Tracking ----
 total_substrands = sum(len(v) for v in domains.values())
-completed_count = 0
 
-# ---- Loop over Domains ----
+def count_completed():
+    count = 0
+    for domain, substrands in domains.items():
+        for sub in substrands:
+            key = f"{domain}_{sub}"
+            if key in st.session_state and st.session_state[key] is not None:
+                count += 1
+    return count
+
+# ---- Form ----
 for domain, substrands in domains.items():
     with st.expander(domain, expanded=False):
         st.markdown(f"## {domain}")  
         for sub in substrands:
             st.markdown(f"**{sub}**")   
-            selection = st.radio(
-                "Select rating:", ratings, key=f"{domain}_{sub}", horizontal=True, index=None
+            st.radio(
+                "Select rating:",
+                ratings,
+                index=None,  # no default
+                key=f"{domain}_{sub}",
+                horizontal=True
             )
-            responses[f"{domain.split(':')[0]}_{sub}"] = selection
-            if selection:  # always true since default is set
-                completed_count += 1
         # Optional reflection
-        responses[f"{domain.split(':')[0]}_Reflection"] = st.text_area(
-            f"{domain} Reflection (optional)", key=f"{domain}_reflection"
+        st.text_area(
+            f"{domain} Reflection (optional)",
+            key=f"{domain}_reflection"
         )
 
 # ---- Overall reflection ----
 st.markdown("## Overall Reflection")
-responses["Overall_Reflection"] = st.text_area("Summarize key strengths, growth areas, and initial goal ideas (optional).")
+st.text_area(
+    "Summarize key strengths, growth areas, and initial goal ideas (optional).",
+    key="overall_reflection"
+)
 
 # ---- Progress Bar ----
+completed_count = count_completed()
 progress = completed_count / total_substrands
 st.sidebar.markdown("### Progress")
 st.sidebar.progress(progress)
@@ -88,8 +104,27 @@ st.sidebar.write(f"{completed_count}/{total_substrands} sub-strands completed ({
 
 # ---- Submit ----
 if st.button("Submit Self-Assessment"):
-    data = [responses.get(col, "") for col in responses.keys()]
-    if len(sheet.get_all_values()) == 0:
-        sheet.append_row(list(responses.keys()))
-    sheet.append_row(data)
-    st.success("✅ Your self-assessment has been saved to Google Sheets!")
+    try:
+        responses = {
+            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "User": user_email
+        }
+
+        # Collect all answers
+        for domain, substrands in domains.items():
+            for sub in substrands:
+                key = f"{domain}_{sub}"
+                responses[f"{domain.split(':')[0]}_{sub}"] = st.session_state.get(key, "")
+            responses[f"{domain.split(':')[0]}_Reflection"] = st.session_state.get(f"{domain}_reflection", "")
+
+        responses["Overall_Reflection"] = st.session_state.get("overall_reflection", "")
+
+        # Append row in same column order each time
+        if len(sheet.get_all_values()) == 0:
+            sheet.append_row(list(responses.keys()))
+        sheet.append_row(list(responses.values()))
+
+        st.success("✅ Your self-assessment has been submitted successfully!")
+
+    except Exception as e:
+        st.error(f"⚠️ Could not save to Google Sheets: {e}")
