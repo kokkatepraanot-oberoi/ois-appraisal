@@ -1,510 +1,136 @@
-
-# app.py
-import time
-from datetime import datetime
-
 import streamlit as st
+import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-import pandas as pd
+from fpdf import FPDF
+from io import BytesIO
 
-# Try to import HttpError; fall back gracefully if googleapiclient isn't present
-try:
-    from googleapiclient.errors import HttpError  # type: ignore
-except Exception:  # pragma: no cover
-    class HttpError(Exception):
-        pass
+# --------------------------
+# GOOGLE SHEETS CONNECTION
+# --------------------------
+@st.cache_resource
+def connect_to_gsheet():
+    scope = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"], scopes=scope
+    )
+    client = gspread.authorize(creds)
+    return client.open_by_key(st.secrets["spreadsheet_id"])
 
-# =========================
-# RERUN helper (Streamlit API changed)
-# =========================
-def _rerun():
-    try:
-        st.rerun()  # Streamlit >=1.32
-    except AttributeError:
-        st.experimental_rerun()  # Older versions
-
-# =========================
-# UI CONFIG (must be first)
-# =========================
-st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
-
-# =========================
-# CONFIG
-# =========================
-SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-ENABLE_REFLECTIONS = True  # set False to hide reflection boxes
-
-# Optional: list of admin emails (lowercase) in .streamlit/secrets.toml
-ADMINS_FROM_SECRETS = set([e.strip().lower() for e in st.secrets.get("admins", [])])
-
-# =========================
-# DOMAINS & SUB-STRANDS (exact from rubric)
-# =========================
+# --------------------------
+# DOMAIN MAPPING
+# --------------------------
 DOMAINS = {
-    "A: Planning and Preparation for Learning": [
-        ("A1", "Expertise"),
-        ("A2", "Goals"),
-        ("A3", "Units"),
-        ("A4", "Assessments"),
-        ("A5", "Anticipation"),
-        ("A6", "Lessons"),
-        ("A7", "Materials"),
-        ("A8", "Differentiation"),
-        ("A9", "Environment"),
-    ],
-    "B: Classroom Management": [
-        ("B1", "Expectations"),
-        ("B2", "Relationships"),
-        ("B3", "Social Emotional"),
-        ("B4", "Routines"),
-        ("B5", "Responsibility"),
-        ("B6", "Repertoire"),
-        ("B7", "Prevention"),
-        ("B8", "Incentives"),
-    ],
-    "C: Delivery of Instruction": [
-        ("C1", "Expectations"),
-        ("C2", "Mindset"),
-        ("C3", "Framing"),
-        ("C4", "Connections"),
-        ("C5", "Clarity"),
-        ("C6", "Repertoire"),
-        ("C7", "Engagement"),
-        ("C8", "Differentiation"),
-        ("C9", "Nimbleness"),
-    ],
-    "D: Monitoring, Assessment, and Follow-Up": [
-        ("D1", "Criteria"),
-        ("D2", "Diagnosis"),
-        ("D3", "Goals"),
-        ("D4", "Feedback"),
-        ("D5", "Recognition"),
-        ("D6", "Analysis"),
-        ("D7", "Tenacity"),
-        ("D8", "Support"),
-        ("D9", "Reflection"),
-    ],
-    "E: Family and Community Outreach": [
-        ("E1", "Respect"),
-        ("E2", "Belief"),
-        ("E3", "Expectations"),
-        ("E4", "Communication"),
-        ("E5", "Involving"),
-        ("E6", "Responsiveness"),
-        ("E7", "Reporting"),
-        ("E8", "Outreach"),
-        ("E9", "Resources"),
-    ],
-    "F: Professional Responsibility": [
-        ("F1", "Language"),
-        ("F2", "Reliability"),
-        ("F3", "Professionalism"),
-        ("F4", "Judgement"),
-        ("F5", "Teamwork"),
-        ("F6", "Leadership"),
-        ("F7", "Openness"),
-        ("F8", "Collaboration"),
-        ("F9", "Growth"),
-    ],
+    "A": "Professional Knowledge",
+    "B": "Instructional Planning",
+    "C": "Classroom Environment",
+    "D": "Instruction",
+    "E": "Assessment",
+    "F": "Professional Responsibilities",
 }
 
-# Rating scale (exact rubric wording)
-RATINGS = [
-    "Highly Effective",
-    "Effective",
-    "Improvement Necessary",
-    "Does Not Meet Standards",
-]
+# --------------------------
+# PDF GENERATOR
+# --------------------------
+def generate_pdf(user_df, user_name):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
 
-# =========================
-# Small retry/backoff for Sheets calls (handles 429/5xx)
-# =========================
-def with_backoff(fn, *args, **kwargs):
-    """Retry gspread/api calls briefly on 429/5xx."""
-    max_attempts = 5
-    delay = 0.6  # seconds
-    last_exc = None
-    for _ in range(max_attempts):
-        try:
-            return fn(*args, **kwargs)
-        except HttpError as e:  # googleapiclient
-            status = getattr(e, "status_code", None)
-            if status in (429, 500, 502, 503, 504):
-                time.sleep(delay); delay *= 2; last_exc = e; continue
-            raise
-        except gspread.exceptions.APIError as e:  # gspread-wrapped
-            msg = str(e).lower()
-            if any(code in msg for code in ["429", "500", "502", "503", "504"]):
-                time.sleep(delay); delay *= 2; last_exc = e; continue
-            raise
-        except Exception as e:
-            time.sleep(delay); delay *= 2; last_exc = e; continue
-    if last_exc:
-        raise last_exc
-    return fn(*args, **kwargs)
+    # Title
+    pdf.cell(200, 10, "OIS Teacher Self-Assessment 2025-26", ln=True, align="C")
+    pdf.ln(10)
 
-# =========================
-# ONE-TIME SHEETS CONNECTION (cached)
-# =========================
-@st.cache_resource
-def get_worksheets():
-    creds = Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
-    client = gspread.authorize(creds)
-    try:
-        ss = client.open_by_key(SPREADSHEET_ID)
-        resp_ws = ss.worksheet("Responses")
-        users_ws = ss.worksheet("Users")
-        return resp_ws, users_ws
-    except Exception as e:
-        st.error("⚠️ Could not access Google Sheet. Ensure the service account has **Editor** access and the Sheet ID is correct.")
-        st.caption(f"Debug info: {e}")
-        st.stop()
+    # Teacher Name
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(40, 10, f"Teacher: {user_name}", ln=True)
+    pdf.ln(5)
 
-RESP_WS, USERS_WS = get_worksheets()
+    # Start grouped sections
+    pdf.set_font("Arial", '', 11)
+    for col in user_df.columns:
+        if col in ["Timestamp", "Email", "Name", "Appraiser"]:
+            continue  # Skip metadata
 
-# =========================
-# HEADER MANAGEMENT (safe, non-destructive)
-# =========================
-def expected_headers():
-    headers = ["Timestamp", "Email", "Name", "Appraiser"]
-    for domain, items in DOMAINS.items():
-        for code, label in items:
-            headers.append(f"{code} {label}")
-        if ENABLE_REFLECTIONS:
-            headers.append(f"{domain} Reflection")
-    return headers
+        # Detect domain prefix (A1, B3, etc.)
+        prefix = col[0]
+        if prefix in DOMAINS:
+            # Add section header if first time in domain
+            if not hasattr(generate_pdf, "last_domain") or generate_pdf.last_domain != prefix:
+                pdf.ln(5)
+                pdf.set_font("Arial", 'B', 13)
+                pdf.set_text_color(0, 51, 102)  # dark blue for headers
+                pdf.cell(0, 8, f"Domain {prefix}: {DOMAINS[prefix]}", ln=True)
+                pdf.set_font("Arial", '', 11)
+                pdf.set_text_color(0, 0, 0)
+                generate_pdf.last_domain = prefix
 
-@st.cache_resource
-def ensure_headers_once():
-    exp = expected_headers()
-    current = with_backoff(RESP_WS.row_values, 1)
-    if not current:
-        with_backoff(RESP_WS.insert_row, exp, 1)
-        return True
-    if current != exp:
-        st.warning(
-            "The existing header row in **Responses** does not match the current rubric. "
-            "Submissions will still append, but columns may be misaligned if the rubric changed. "
-            "To update safely, export data, fix headers offline, and re-import."
-        )
-    return True
+        # Write question + response
+        value = str(user_df[col].values[0])
+        pdf.set_font("Arial", 'B', 11)
+        pdf.multi_cell(0, 8, f"{col}:", border=0)
+        pdf.set_font("Arial", '', 11)
+        pdf.multi_cell(0, 8, f"{value}", border=0)
 
-ensure_headers_once()
+    # Reset domain tracker
+    generate_pdf.last_domain = None
 
-# =========================
-# USERS: read ONCE per server process (auto‑detect headers)
-# =========================
-def _pick_col(candidates: list[str], cols: list[str]):
-    norm_map = {c.strip().lower(): c for c in cols}
-    for want in candidates:
-        key = want.strip().lower()
-        if key in norm_map: return norm_map[key]
-    for c in cols:
-        cl = c.strip().lower()
-        if any(w in cl for w in candidates): return c
-    return None
+    # Output as BytesIO
+    pdf_buffer = BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
+    return pdf_buffer
 
-@st.cache_resource
-def load_users_once_df():
-    records = with_backoff(USERS_WS.get_all_records)
-    if not records:
-        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role"])
-    df = pd.DataFrame(records)
+# --------------------------
+# APP LAYOUT
+# --------------------------
+st.sidebar.title("Account")
+
+if "user_name" not in st.session_state:
+    st.session_state["user_name"] = "Praanot Kokkate"  # temp login simulation
+if "user_email" not in st.session_state:
+    st.session_state["user_email"] = "praanot.kokkate@oberoi-is.org"
+
+st.sidebar.success(f"Logged in as {st.session_state['user_name']}")
+
+menu = st.sidebar.radio("Menu", ["My Submission"])
+
+if menu == "My Submission":
+    st.header("📄 My Submission")
+
+    sh = connect_to_gsheet()
+    worksheet = sh.worksheet("Form Responses 1")
+    df = pd.DataFrame(worksheet.get_all_records())
+
     if df.empty:
-        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role"])
-
-    cols = list(df.columns)
-
-    email_header = _pick_col(["email","school email","work email","ois email","e-mail"], cols)
-    name_header = _pick_col(["name","full name","teacher name","staff name"], cols)
-    appraiser_header = _pick_col(["appraiser","line manager","manager","appraiser name","supervisor"], cols)
-    role_header = _pick_col(["role","access","admin"], cols)
-
-    out = pd.DataFrame()
-    out["Email"] = df[email_header].astype(str).str.strip().str.lower() if email_header else ""
-    out["Name"] = df[name_header].astype(str).str.strip() if name_header else ""
-    out["Appraiser"] = (df[appraiser_header].astype(str).str.strip().replace({"": "Not Assigned"})
-                        if appraiser_header else "Not Assigned")
-    out["Role"] = df[role_header].astype(str).str.strip().str.lower() if role_header else ""
-    return out
-
-users_df = load_users_once_df()
-
-# =========================
-# RESPONSES cache (for 'My submission' and Admin)
-# Robust header normalization to ensure 'Email' exists
-# =========================
-@st.cache_data(ttl=180)
-def load_responses_df():
-    vals = with_backoff(RESP_WS.get_all_values)
-    if not vals:
-        return pd.DataFrame()
-    header, rows = vals[0], vals[1:]
-    df = pd.DataFrame(rows, columns=header) if rows else pd.DataFrame(columns=header)
-
-    # Normalize likely email column to 'Email'
-    if "Email" not in df.columns:
-        email_col = None
-        for c in df.columns:
-            cl = str(c).strip().lower()
-            if cl == "email" or "email" in cl:
-                email_col = c
-                break
-        if email_col:
-            df.rename(columns={email_col: "Email"}, inplace=True)
-
-    # Normalize timestamp casing if needed
-    if "Timestamp" not in df.columns:
-        for c in df.columns:
-            if str(c).strip().lower() == "timestamp":
-                df.rename(columns={c: "Timestamp"}, inplace=True)
-                break
-
-    # Lowercase emails for matching
-    if "Email" in df.columns:
-        df["Email"] = df["Email"].astype(str).str.strip().str.lower()
-
-    return df
-
-def user_has_submission(email: str) -> bool:
-    if not email:
-        return False
-    df = load_responses_df()
-    return (not df.empty) and ("Email" in df.columns) and (not df[df["Email"] == email.strip().lower()].empty)
-
-# Build a row that matches the CURRENT header order to avoid misalignment
-def build_row_aligned(email: str, name: str, appraiser: str, selections: dict, reflections: dict):
-    headers = with_backoff(RESP_WS.row_values, 1)
-    values = {}
-
-    # core fields
-    values["Timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    values["Email"] = email
-    values["Name"] = name
-    values["Appraiser"] = appraiser
-
-    # ratings
-    for domain, items in DOMAINS.items():
-        for code, label in items:
-            values[f"{code} {label}"] = selections.get(f"{code} {label}", "")
-
-        # reflections per domain
-        refl_key = f"{domain} Reflection"
-        if ENABLE_REFLECTIONS:
-            values[refl_key] = reflections.get(domain, "")
-
-    # return row in the exact order of current headers (unknown variations handled)
-    return [values.get(h, "") for h in headers]
-
-# =========================
-# AUTH: Login / Logout
-# =========================
-def is_admin(email: str) -> bool:
-    e = (email or "").strip().lower()
-    role_flag = False
-    if not users_df.empty and "Email" in users_df.columns and "Role" in users_df.columns:
-        row = users_df[users_df["Email"] == e]
-        if not row.empty:
-            role_flag = row.iloc[0].get("Role","").lower() in {"admin","administrator"}
-    return (e in ADMINS_FROM_SECRETS) or role_flag
-
-if "auth_email" not in st.session_state:
-    st.session_state.auth_email = ""
-if "auth_name" not in st.session_state:
-    st.session_state.auth_name = ""
-if "submitted" not in st.session_state:
-    st.session_state.submitted = False
-
-# ---- Sidebar: Login box ----
-st.sidebar.header("Account")
-if st.session_state.auth_email:
-    st.sidebar.success(f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}**")
-    if st.sidebar.button("Logout"):
-        st.session_state.auth_email = ""
-        st.session_state.auth_name = ""
-        st.session_state.submitted = False
-        _rerun()
-else:
-    email_input = st.sidebar.text_input("School email (e.g., firstname.lastname@oberoi-is.org)").strip().lower()
-    login = st.sidebar.button("Login")
-    if login:
-        if email_input and not users_df.empty and "Email" in users_df.columns:
-            match = users_df[users_df["Email"] == email_input]
-            if not match.empty:
-                st.session_state.auth_email = email_input
-                st.session_state.auth_name = match.iloc[0].get("Name","")
-                st.success("Logged in.")
-                _rerun()
-            else:
-                st.sidebar.error("Email not found in Users sheet.")
-
-# =========================
-# Sidebar: Live progress (no API calls)
-# =========================
-total_items = sum(len(v) for v in DOMAINS.values())
-def current_progress_from_session() -> int:
-    count = 0
-    for _, items in DOMAINS.items():
-        for code, label in items:
-            if st.session_state.get(f"{code}-{label}"):
-                count += 1
-    return count
-
-with st.sidebar.expander("Progress", expanded=True):
-    done = current_progress_from_session()
-    st.progress(done / total_items if total_items else 0.0)
-    st.caption(f"{done}/{total_items} sub‑strands completed")
-
-# Main Nav
-st.title("🌟 OIS Teacher Self‑Assessment 2025‑26")
-
-if not st.session_state.auth_email:
-    st.info("Please log in from the sidebar to continue.")
-    st.stop()
-
-already_submitted = user_has_submission(st.session_state.auth_email)
-i_am_admin = is_admin(st.session_state.auth_email)
-
-# If the teacher already submitted, hide the Self‑Assessment tab (admins still see it)
-if already_submitted and not i_am_admin:
-    st.success("Submission on file. You can view it under **My Submission**.")
-    nav_options = ["My Submission"]
-else:
-    nav_options = ["Self‑Assessment", "My Submission"]
-
-if i_am_admin:
-    nav_options.append("Admin")
-
-tab = st.sidebar.radio("Menu", nav_options, index=0)
-
-# =========================
-# Page: Self‑Assessment
-# =========================
-if already_submitted and not i_am_admin:
-    st.info("You’ve already submitted your self‑assessment. You can view or download it in **My Submission**.")
-    st.stop()
-
-if tab == "Self‑Assessment":
-    # Welcome
-    me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0] if not users_df.empty else {}
-    appraiser = me.get("Appraiser","Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
-    st.sidebar.info(f"Your appraiser: **{appraiser}**")
-
-    # Selections are just direct widgets (outside a form) so the sidebar progress updates live.
-    selections = {}
-    reflections = {}
-    for domain, items in DOMAINS.items():
-        with st.expander(domain, expanded=False):
-            for code, label in items:
-                key = f"{code}-{label}"
-                selections[f"{code} {label}"] = st.radio(
-                    f"{code} — {label}",
-                    RATINGS,
-                    index=None,
-                    key=key,
-                ) or ""
-            if ENABLE_REFLECTIONS:
-                reflections[domain] = st.text_area(
-                    f"{domain} Reflection (optional)",
-                    key=f"refl-{domain}",
-                    placeholder="Notes / evidence / next steps (optional)",
-                )
-
-    # Submit
-    selected_count = sum(1 for v in selections.values() if v)
-    col1, col2 = st.columns([1,3])
-    with col1:
-        submit = st.button("✅ Submit")
-    with col2:
-        st.write(f"**Progress:** {selected_count}/{total_items} completed")
-
-    if submit:
-        if selected_count < total_items:
-            st.warning("Please rate **all** sub‑strands before submitting.")
-        else:
-            try:
-                row = build_row_aligned(
-                    email=st.session_state.auth_email,
-                    name=st.session_state.auth_name,
-                    appraiser=appraiser,
-                    selections=selections,
-                    reflections=reflections,
-                )
-                with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
-                # make new submission visible immediately
-                load_responses_df.clear()
-                st.session_state.submitted = True
-                st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
-            except Exception as e:
-                st.error("⚠️ Could not submit right now. Please try again shortly.")
-                st.caption(f"Debug info: {e}")
-
-# =========================
-# Page: My Submission (teacher view)
-# =========================
-if tab == "My Submission":
-    df = load_responses_df()
-
-    my = pd.DataFrame()
-    if not df.empty and "Email" in df.columns:
-        me = st.session_state.auth_email.strip().lower()
-        series = df["Email"].astype(str).str.strip().str.lower()
-        my = df[series == me]
-
-    # auto-refresh (handles stale cache after recent submit)
-    if my.empty:
-        load_responses_df.clear()
-        df = load_responses_df()
-        if "Email" in df.columns:
-            series = df["Email"].astype(str).str.strip().str.lower()
-            my = df[series == me]
-
-    st.subheader("My Submission")
-    if my.empty:
-        st.info("No submission found yet.")
+        st.info("No submissions yet.")
     else:
-        my_sorted = my.sort_values("Timestamp", ascending=False) if "Timestamp" in my.columns else my
-        latest = my_sorted.head(1)
-        st.dataframe(latest, use_container_width=True)
-        csv = my_sorted.to_csv(index=False).encode("utf-8")
-        st.download_button("Download my submissions (CSV)", data=csv, file_name="my_self_assessment.csv", mime="text/csv")
+        user_df = df[df["Email"].str.strip().str.lower() ==
+                     st.session_state["user_email"].strip().lower()]
 
-    if st.button("🔄 Refresh"):
-        load_responses_df.clear()
-        _rerun()
+        if not user_df.empty:
+            st.success("Here is your submitted self-assessment:")
 
-# =========================
-# Page: Admin (only for admins)
-# =========================
-if tab == "Admin":
-    if not is_admin(st.session_state.auth_email):
-        st.error("Admin access only.")
-    else:
-        st.subheader("All Responses")
-        df = load_responses_df()
-        if df.empty:
-            st.info("No responses yet.")
+            # Show table
+            st.dataframe(user_df.T.rename(columns={user_df.index[0]: "Response"}))
+
+            # CSV Download
+            csv = user_df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                label="⬇️ Download My Submission (CSV)",
+                data=csv,
+                file_name=f"{st.session_state['user_name']}_self_assessment.csv",
+                mime="text/csv",
+            )
+
+            # PDF Download
+            pdf_buffer = generate_pdf(user_df, st.session_state["user_name"])
+            st.download_button(
+                label="📑 Download My Submission (PDF)",
+                data=pdf_buffer,
+                file_name=f"{st.session_state['user_name']}_self_assessment.pdf",
+                mime="application/pdf",
+            )
+
         else:
-            c1, c2 = st.columns(2)
-            with c1:
-                q_name = st.text_input("Filter by Name contains", "")
-            with c2:
-                q_email = st.text_input("Filter by Email contains", "")
-
-            view = df.copy()
-            if "Name" in view.columns and q_name:
-                view = view[view["Name"]].astype(str)
-                view = df[df["Name"].str.contains(q_name, case=False, na=False)]
-            if "Email" in view.columns and q_email:
-                view = df[df["Email"].str.contains(q_email, case=False, na=False)]
-
-            st.dataframe(view, use_container_width=True, height=480)
-
-            csv_all = view.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Download filtered (CSV)", data=csv_all, file_name="responses_filtered.csv", mime="text/csv")
-
-        if st.button("🔄 Refresh"):
-            load_responses_df.clear()
-            _rerun()
+            st.warning("No submission found for your account.")
