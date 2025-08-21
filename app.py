@@ -311,7 +311,14 @@ def authenticate_user(email, password):
     if user_row.empty:
         return None, None  # not found
 
-    role = user_row.iloc[0]["Role"].strip().lower()
+    user_match = users_df[users_df["Email"].str.lower() == st.session_state.auth_email.lower()]
+
+    if not user_match.empty:
+        role = str(user_match.iloc[0]["Role"]).strip().lower()
+    else:
+        st.error("User not found in Users sheet. Please check your email or contact admin.")
+        st.stop()
+
 
     # Admin check
     if role == "admin":
