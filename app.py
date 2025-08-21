@@ -256,6 +256,21 @@ def user_has_submission(email: str) -> bool:
 # =========================
 # AUTH: Login / Logout
 # =========================
+def is_admin(email: str) -> bool:
+    e = (email or "").strip().lower()
+    role_flag = False
+    if not users_df.empty and "Email" in users_df.columns and "Role" in users_df.columns:
+        row = users_df[users_df["Email"] == e]
+        if not row.empty:
+            role_flag = row.iloc[0].get("Role","").lower() in {"admin","administrator"}
+    return (e in ADMINS_FROM_SECRETS) or role_flag
+
+if "auth_email" not in st.session_state:
+    st.session_state.auth_email = ""
+if "auth_name" not in st.session_state:
+    st.session_state.auth_name = ""
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
 
 # ---- Sidebar: Login box ----
 st.sidebar.header("Account")
