@@ -553,8 +553,7 @@ if tab == "My Submission":
         load_responses_df.clear()
         _rerun()
 
-
-    # =========================
+# =========================
 # Page: Admin Panel (Admin & Super Admin)
 # =========================
 elif tab == "Admin Panel" and i_am_admin:
@@ -567,11 +566,15 @@ elif tab == "Admin Panel" and i_am_admin:
 
     # Decide scope
     if my_role == "sadmin":
-        view_df = responses_df.copy()
-        st.info("Super Admin access: viewing **all teachers** in the school.")
-    else:
-        view_df = responses_df[responses_df["Appraiser"] == my_name]
-        st.info("Admin access: viewing only **your appraisees**.")
+    view_df = responses_df.copy()
+    st.info("Super Admin access: viewing **all teachers** in the school.")
+else:
+    admin_name = my_name.split()[0].strip().lower()
+    view_df = responses_df[
+        responses_df["Appraiser"].str.strip().str.lower() == admin_name
+    ]
+    st.info("Admin access: viewing only **your appraisees**.")
+
 
     if view_df.empty:
         st.info("ℹ️ No submissions yet.")
