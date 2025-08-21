@@ -408,6 +408,7 @@ else:
         )
 
 
+
         token = oauth2.authorize_button(
             name="Login with Google",
             icon="🔒",
