@@ -629,13 +629,14 @@ else:
 
     # Color mapping for ratings
     def highlight_ratings(val):
-        colors = {
-            "Highly Effective": "background-color: #a8e6a1;",  # green
-            "Effective": "background-color: #d0f0fd;",        # blue
-            "Developing": "background-color: #fff3b0;",       # yellow
-            "Does Not Meet": "background-color: #f8a5a5;"     # red
-        }
-        return colors.get(val, "")
+    colors = {
+        "Highly Effective": "background-color: #a8e6a1;",      # green
+        "Effective": "background-color: #d0f0fd;",            # blue
+        "Developing": "background-color: #fff3b0;",           # yellow
+        "Improvement Necessary": "background-color: #ffd6a5;", # orange
+        "Does Not Meet Standards": "background-color: #f8a5a5;" # red
+    }
+    return colors.get(val, "")
 
     styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
 
