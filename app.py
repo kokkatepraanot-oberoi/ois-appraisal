@@ -391,35 +391,33 @@ if tab == "Self-Assessment":
         selected_count = sum(1 for v in selections.values() if v)
         col1, col2 = st.columns([1,3])
         with col1:
-            submit = st.button("✅ Submit")
+            submit = st.button("✅ Submit", disabled=(selected_count < total_items))
         with col2:
             st.write(f"**Progress:** {selected_count}/{total_items} completed")
-
+        
         if submit:
-            if selected_count < total_items:
-                st.warning("Please rate **all** sub-strands before submitting.")
-            else:
-                row = [
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    st.session_state.auth_email,
-                    st.session_state.auth_name,
-                    appraiser,
-                ]
-                for domain, items in DOMAINS.items():
-                    for code, label in items:
-                        row.append(selections[f"{code} {label}"])
-                    if ENABLE_REFLECTIONS:
-                        row.append(reflections.get(domain, ""))
+            # At this point we already know all strands are filled
+            row = [
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                st.session_state.auth_email,
+                st.session_state.auth_name,
+                appraiser,
+            ]
+            for domain, items in DOMAINS.items():
+                for code, label in items:
+                    row.append(selections[f"{code} {label}"])
+                if ENABLE_REFLECTIONS:
+                    row.append(reflections.get(domain, ""))
+        
+            try:
+                with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
+                load_responses_df.clear()
+                st.session_state.submitted = True
+                st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
+            except Exception as e:
+                st.error("⚠️ Could not submit right now. Please try again shortly.")
+                st.caption(f"Debug info: {e}")
 
-                try:
-                    with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
-                    # make new submission visible immediately
-                    load_responses_df.clear()
-                    st.session_state.submitted = True
-                    st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
-                except Exception as e:
-                    st.error("⚠️ Could not submit right now. Please try again shortly.")
-                    st.caption(f"Debug info: {e}")
 
 # =========================
 # Page: My Submission (teachers see their data here)
