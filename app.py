@@ -311,7 +311,7 @@ def authenticate_user(email, password):
     if user_row.empty:
         return None, None  # not found
 
-    role = str(user_row.iloc[0]["Role"]).strip().lower()
+    role = user_row.iloc[0]["Role"].strip().lower()
 
     # Admin check
     if role == "admin":
@@ -321,7 +321,7 @@ def authenticate_user(email, password):
     if role == "sadmin":
         return ("sadmin", user_row.iloc[0]) if password == "SOIS2025" else (None, None)
 
-    # Teacher check — validate against Password column
+    # Teacher check — now validate against Password column in Users sheet
     if role == "user":
         stored_pw = str(user_row.iloc[0].get("Password", "")).strip()
         if stored_pw and password == stored_pw:
@@ -330,7 +330,6 @@ def authenticate_user(email, password):
             return None, None
 
     return None, None
-
 
 # =========================
 # AUTH: Login / Logout
@@ -361,7 +360,9 @@ else:
     email_input = st.sidebar.text_input(
         "School email (e.g., firstname.lastname@oberoi-is.org)"
     ).strip().lower()
-    password_input = st.sidebar.text_input("Password", type="password")
+    password_input = st.sidebar.text_input(
+        "Password (Admins/Super Admins only)", type="password"
+    )
 
     if st.sidebar.button("Login"):
         role, me = authenticate_user(email_input, password_input)
@@ -371,13 +372,6 @@ else:
             st.session_state.auth_name = me.get("Name", "")
             st.session_state.auth_role = role
             st.sidebar.success(f"✅ {role.capitalize()} login successful.")
-
-            # Redirect logic
-            if role == "user":
-                st.switch_page("pages/self_assessment.py")
-            elif role in {"admin", "sadmin"}:
-                st.switch_page("pages/admin_dashboard.py")
-
             _rerun()
         else:
             st.sidebar.error("❌ Invalid email or password.")
