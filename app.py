@@ -311,14 +311,7 @@ def authenticate_user(email, password):
     if user_row.empty:
         return None, None  # not found
 
-    user_match = users_df[users_df["Email"].str.lower() == st.session_state.auth_email.lower()]
-
-    if not user_match.empty:
-        role = str(user_match.iloc[0]["Role"]).strip().lower()
-    else:
-        st.error("User not found in Users sheet. Please check your email or contact admin.")
-        st.stop()
-
+    role = str(user_row.iloc[0]["Role"]).strip().lower()
 
     # Admin check
     if role == "admin":
@@ -368,9 +361,7 @@ else:
     email_input = st.sidebar.text_input(
         "School email (e.g., firstname.lastname@oberoi-is.org)"
     ).strip().lower()
-    password_input = st.sidebar.text_input(
-        "Password", type="password"
-    )
+    password_input = st.sidebar.text_input("Password", type="password")
 
     if st.sidebar.button("Login"):
         role, me = authenticate_user(email_input, password_input)
@@ -380,10 +371,16 @@ else:
             st.session_state.auth_name = me.get("Name", "")
             st.session_state.auth_role = role
             st.sidebar.success(f"✅ {role.capitalize()} login successful.")
+
+            # Redirect logic
+            if role == "user":
+                st.switch_page("pages/self_assessment.py")
+            elif role in {"admin", "sadmin"}:
+                st.switch_page("pages/admin_dashboard.py")
+
             _rerun()
         else:
             st.sidebar.error("❌ Invalid email or password.")
-
 
 
 # =========================
