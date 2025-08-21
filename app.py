@@ -434,13 +434,14 @@ if tab == "My Submission":
 if tab == "Admin" and i_am_admin:
     st.header("👩‍💼 Admin Panel")
 
-    # Which admin am I?
     me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0]
     my_name = me.get("Name", st.session_state.auth_email)
+    my_first = my_name.split()[0].strip().lower()
 
-    # Teachers assigned to me
-    assigned = users_df[users_df["Appraiser"].str.lower() == my_name.strip().lower()] \
-        if not users_df.empty else pd.DataFrame()
+    # Teachers assigned to me (Appraiser column contains first name)
+    assigned = users_df[
+        users_df["Appraiser"].str.strip().str.lower() == my_first
+    ] if not users_df.empty else pd.DataFrame()
 
     if assigned.empty:
         st.info("No teachers are currently assigned to you in the Users sheet.")
