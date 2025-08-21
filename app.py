@@ -472,7 +472,11 @@ if tab == "Self-Assessment":
         selected_count = sum(1 for v in selections.values() if v)
         col1, col2 = st.columns([1,3])
         with col1:
-            submit = st.button("✅ Submit", disabled=(selected_count < total_items))
+            submit = st.button(
+                "✅ Submit",
+                disabled=(selected_count < total_items) or st.session_state.get("submitted", False)
+            )
+
             save_draft_btn = st.button("💾 Save Draft Now")
         with col2:
             st.write(f"**Progress:** {selected_count}/{total_items} completed")
