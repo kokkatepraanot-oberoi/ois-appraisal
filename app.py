@@ -636,7 +636,7 @@ else:
             "Improvement Necessary": "background-color: #ffd6a5;", # orange
             "Does Not Meet Standards": "background-color: #f8a5a5;" # red
         }
-    return colors.get(val, "")
+        return colors.get(val, "")
 
     styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
 
