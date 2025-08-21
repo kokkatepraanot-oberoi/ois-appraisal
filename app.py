@@ -321,15 +321,17 @@ def authenticate_user(email, password):
     if role == "sadmin":
         return ("sadmin", user_row.iloc[0]) if password == "SOIS2025" else (None, None)
 
-    # Teacher check — now validate against Password column in Users sheet
+    # Teacher check — validate against Password column
     if role == "user":
         stored_pw = str(user_row.iloc[0].get("Password", "")).strip()
-        if stored_pw and password == stored_pw:
+        entered_pw = str(password).strip()
+
+        if stored_pw and entered_pw and stored_pw == entered_pw:
             return "user", user_row.iloc[0]
         else:
+            st.warning(f"Debug → Entered: '{entered_pw}', Stored: '{stored_pw}'")
             return None, None
 
-    return None, None
 
 # =========================
 # AUTH: Login / Logout
