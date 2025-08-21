@@ -315,19 +315,19 @@ def authenticate_user(email, password):
 
     # Role-based password check
     if role == "admin":
-        if password == "OIS2025":
+        if password == DEFAULT_ADMIN_PASSWORD:
             return "admin", user_row.iloc[0]
         else:
             return None, None
 
     elif role == "sadmin":  # super admin
-        if password == "SOIS2025":
+        if password == DEFAULT_SADMIN_PASSWORD:
             return "sadmin", user_row.iloc[0]
         else:
             return None, None
 
     elif role == "user":  # teachers
-        # Teachers don’t need a password (email match is enough)
+        # Teachers don’t use password here
         return "user", user_row.iloc[0]
 
     return None, None
@@ -408,18 +408,16 @@ else:
                 prompt="consent"
             )
 
-            # --- Sidebar link ---
             st.sidebar.markdown(f"[Login with Google]({authorization_url})")
 
-
-            query_params = st.query_params  # modern API
+            query_params = st.query_params
             if "code" in query_params:
                 code = query_params["code"][0]
                 token = oauth.fetch_token(token_url, code=code)
                 st.session_state.token = token
                 st.rerun()
         else:
-            # Refresh if expired and refresh_token present
+            # Refresh if expired
             oauth = OAuth2Session(client_id, client_secret, redirect_uri=redirect_uri)
             token = st.session_state.token
             if oauth.token.is_expired() and "refresh_token" in token:
@@ -431,22 +429,19 @@ else:
                 user_info = jwt.decode(id_token, options={"verify_signature": False})
                 google_email = user_info.get("email", "").lower()
 
+                # Check in Users sheet
                 match = users_df[users_df["Email"].str.lower() == google_email]
                 if not match.empty and match.iloc[0].get("Role", "").lower() == "user":
                     st.session_state.auth_email = google_email
                     st.session_state.auth_name = match.iloc[0].get("Name", "")
                     st.session_state.auth_role = "user"
-                    st.success("✅ Teacher login successful.")
+                    _rerun()  # 👈 immediately rerun into teacher flow
                 else:
                     st.sidebar.error("Not authorized as Teacher.")
-            st.write("Google email:", google_email)
-            st.write("users_df preview:", users_df.head())
-
 
     except Exception as e:
         st.sidebar.warning("⚠️ Google login not configured. Add OAuth secrets to enable Teacher login.")
         st.sidebar.caption(f"Debug: {e}")
-
 
 
 # =========================
