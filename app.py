@@ -460,24 +460,29 @@ if tab == "My Submission":
 
 
 # =========================
-# Page: Admin Panel
+# Page: Admin Panel (Admin & Super Admin)
 # =========================
 if tab == "Admin" and i_am_admin:
     st.header("👩‍💼 Admin Panel")
 
     me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0]
     my_name = me.get("Name", st.session_state.auth_email)
+    my_role = me.get("Role", "").strip().lower()
     my_first = my_name.split()[0].strip().lower()
 
-    # Teachers assigned to me (Appraiser column contains first name)
-    assigned = users_df[
-        users_df["Appraiser"].str.strip().str.lower() == my_first
-    ] if not users_df.empty else pd.DataFrame()
+    # Admins only see their assigned teachers, Super Admin sees all
+    if my_role == "sadmin":
+        assigned = users_df[users_df["Role"] == "user"]  # all teachers
+        st.info("Super Admin access: viewing **all teachers** in the school.")
+    else:
+        assigned = users_df[
+            users_df["Appraiser"].str.strip().str.lower() == my_first
+        ] if not users_df.empty else pd.DataFrame()
 
     if assigned.empty:
-        st.info("No teachers are currently assigned to you in the Users sheet.")
+        st.info("No teachers found for your role in the Users sheet.")
     else:
-        st.subheader("📋 Summary of Assigned Teachers")
+        st.subheader("📋 Summary of Teachers")
 
         resp_df = load_responses_df()
         summary_rows = []
@@ -517,27 +522,13 @@ if tab == "Admin" and i_am_admin:
         with col2:
             st.progress(submitted_count / total_count if total_count else 0)
 
-        # Show summary table
         st.dataframe(summary_df, use_container_width=True)
 
-
-
-        # Optional: download summary
-        csv = summary_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "⬇️ Download Summary (CSV)",
-            data=csv,
-            file_name=f"{my_first}_summary.csv",
-            mime="text/csv"
-        )
-
+        # Dropdown for deep dive
         st.divider()
-
         st.subheader("🔎 View Individual Submissions")
-        teacher_choice = st.selectbox(
-            "Select a teacher",
-            assigned["Name"].tolist()
-        )
+
+        teacher_choice = st.selectbox("Select a teacher", assigned["Name"].tolist())
 
         if teacher_choice:
             teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
