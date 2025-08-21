@@ -614,37 +614,36 @@ if tab == "Super Admin" and i_am_sadmin:
     )
 
     # =========================
-    # Full Grid View
-    # =========================
-    st.subheader("📊 Detailed Whole-School Submissions")
+# Full Grid View
+# =========================
+st.subheader("📊 Detailed Whole-School Submissions")
 
-    all_responses = responses_ws.get_all_records()
-    df = pd.DataFrame(all_responses)
+df = load_responses_df()
 
-    if df.empty:
-        st.info("No submissions found yet.")
-    else:
-        # Reset index for numbering
-        df.index = df.index + 1
-        df.index.name = "No."
+if df.empty:
+    st.info("No submissions found yet.")
+else:
+    # Reset index for numbering
+    df.index = df.index + 1
+    df.index.name = "No."
 
-        # Color mapping for ratings
-        def highlight_ratings(val):
-            colors = {
-                "Highly Effective": "background-color: #a8e6a1;",  # green
-                "Effective": "background-color: #d0f0fd;",        # blue
-                "Developing": "background-color: #fff3b0;",       # yellow
-                "Does Not Meet": "background-color: #f8a5a5;"     # red
-            }
-            return colors.get(val, "")
+    # Color mapping for ratings
+    def highlight_ratings(val):
+        colors = {
+            "Highly Effective": "background-color: #a8e6a1;",  # green
+            "Effective": "background-color: #d0f0fd;",        # blue
+            "Developing": "background-color: #fff3b0;",       # yellow
+            "Does Not Meet": "background-color: #f8a5a5;"     # red
+        }
+        return colors.get(val, "")
 
-        styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
+    styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
 
-        st.dataframe(styled_df, use_container_width=True)
+    st.dataframe(styled_df, use_container_width=True)
 
-        st.download_button(
-            "⬇️ Download All Submissions (CSV)",
-            df.to_csv(index=True).encode("utf-8"),
-            "all_submissions.csv",
-            "text/csv"
-        )
+    st.download_button(
+        "⬇️ Download All Submissions (CSV)",
+        df.to_csv(index=True).encode("utf-8"),
+        "all_submissions.csv",
+        "text/csv"
+    )
