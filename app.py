@@ -1,3 +1,4 @@
+
 # app.py
 import time
 from datetime import datetime
@@ -252,6 +253,32 @@ def _pick_col(candidates: list[str], cols: list[str]):
         if any(w in cl for w in candidates): return c
     return None
 
+@st.cache_resource
+def load_users_once_df():
+    records = with_backoff(USERS_WS.get_all_records)
+    if not records:
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role"])
+    df = pd.DataFrame(records)
+    if df.empty:
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role"])
+
+    cols = list(df.columns)
+
+    email_header = _pick_col(["email","school email","work email","ois email","e-mail"], cols)
+    name_header = _pick_col(["name","full name","teacher name","staff name"], cols)
+    appraiser_header = _pick_col(["appraiser","line manager","manager","appraiser name","supervisor"], cols)
+    role_header = _pick_col(["role","access","admin"], cols)
+
+    out = pd.DataFrame()
+    out["Email"] = df[email_header].astype(str).str.strip().str.lower() if email_header else ""
+    out["Name"] = df[name_header].astype(str).str.strip() if name_header else ""
+    out["Appraiser"] = (df[appraiser_header].astype(str).str.strip().replace({"": "Not Assigned"})
+                        if appraiser_header else "Not Assigned")
+    out["Role"] = df[role_header].astype(str).str.strip().str.lower() if role_header else ""
+    return out
+
+users_df = load_users_once_df()
+
 # =========================
 # RESPONSES cache (for 'My submission' and Admin)
 # =========================
@@ -273,72 +300,40 @@ def user_has_submission(email: str) -> bool:
     df = load_responses_df()
     return (not df.empty) and ("Email" in df.columns) and (not df[df["Email"] == email.strip().lower()].empty)
 
-
-
-# =========================
-# Load Users (with password + first login)
-# =========================
-@st.cache_resource
-def load_users_once_df():
-    records = USERS_WS.get_all_records()
-    if not records:
-        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role", "Password", "FirstLogin"])
-    df = pd.DataFrame(records)
-
-    df["Email"] = df["Email"].astype(str).str.strip().str.lower()
-    df["Role"] = df["Role"].astype(str).str.strip().str.lower()
-    df["Password"] = df.get("Password", "").astype(str).str.strip()
-    df["FirstLogin"] = df.get("FirstLogin", "").astype(str).str.strip().str.upper().replace(
-        {"TRUE": True, "FALSE": False}
-    )
-    return df
-
-users_df = load_users_once_df()
-
-# =========================
-# Update password in Users sheet
-# =========================
-def update_password(email, new_pw):
-    try:
-        all_data = USERS_WS.get_all_records()
-        emails = [r["Email"].strip().lower() for r in all_data]
-        if email in emails:
-            row_num = emails.index(email) + 2  # +2 accounts for header row
-            USERS_WS.update_acell(f"E{row_num}", new_pw)      # Password column
-            USERS_WS.update_acell(f"F{row_num}", "FALSE")     # FirstLogin column
-            return True
-    except Exception as e:
-        st.error(f"⚠️ Could not update password: {e}")
-    return False
-
 # =========================
 # Authentication & Roles
 # =========================
 def authenticate_user(email, password):
     email = email.strip().lower()
+
+    # Look up in Users sheet
     user_row = users_df[users_df["Email"].str.lower() == email]
     if user_row.empty:
-        return None, None
+        return None, None  # not found
 
-    row = user_row.iloc[0]
-    role = row["Role"]
+    role = user_row.iloc[0]["Role"].strip().lower()
 
+    # Admin check
     if role == "admin":
-        return ("admin", row) if password == row["Password"] else (None, None)
+        return ("admin", user_row.iloc[0]) if password == "OIS2025" else (None, None)
 
-    elif role == "sadmin":
-        return ("sadmin", row) if password == row["Password"] else (None, None)
+    # Superadmin check
+    if role == "sadmin":
+        return ("sadmin", user_row.iloc[0]) if password == "SOIS2025" else (None, None)
 
-    elif role == "user":
-        if password == row["Password"]:
-            if row.get("FirstLogin", True):  # force change
-                return ("force_change", row)
-            return ("user", row)
+    # Teacher check — validate against Password column
+    if role == "user":
+        stored_pw = str(user_row.iloc[0].get("Password", "")).strip()
+        if stored_pw and password == stored_pw:
+            return "user", user_row.iloc[0]
+        else:
+            return None, None
 
     return None, None
 
+
 # =========================
-# Auth Session State
+# AUTH: Login / Logout
 # =========================
 if "auth_email" not in st.session_state:
     st.session_state.auth_email = ""
@@ -349,60 +344,39 @@ if "auth_role" not in st.session_state:
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
-# =========================
-# AUTH UI
-# =========================
 st.sidebar.header("Account")
 
-# --- Logout ---
 if st.session_state.auth_email:
     st.sidebar.success(
         f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}** "
         f"({st.session_state.auth_role})"
     )
     if st.sidebar.button("Logout"):
-        for key in ["auth_email", "auth_name", "auth_role", "submitted"]:
-            st.session_state[key] = ""
+        st.session_state.auth_email = ""
+        st.session_state.auth_name = ""
+        st.session_state.auth_role = ""
+        st.session_state.submitted = False
         _rerun()
-
 else:
-    st.sidebar.subheader("🔑 Login")
-    email_input = st.sidebar.text_input("School email").strip().lower()
-    password_input = st.sidebar.text_input("Password", type="password")
+    email_input = st.sidebar.text_input(
+        "School email (e.g., firstname.lastname@oberoi-is.org)"
+    ).strip().lower()
+    password_input = st.sidebar.text_input(
+        "Password", type="password"
+    )
 
     if st.sidebar.button("Login"):
         role, me = authenticate_user(email_input, password_input)
-        if role in {"admin", "sadmin", "user"}:
+
+        if role:
             st.session_state.auth_email = email_input
             st.session_state.auth_name = me.get("Name", "")
             st.session_state.auth_role = role
             st.sidebar.success(f"✅ {role.capitalize()} login successful.")
             _rerun()
-        elif role == "force_change":
-            st.session_state.auth_email = email_input
-            st.session_state.auth_name = me.get("Name", "")
-            st.session_state.auth_role = "force_change"
-            _rerun()
         else:
-            st.sidebar.error("Invalid credentials.")
+            st.sidebar.error("❌ Invalid email or password.")
 
-# =========================
-# Force Password Change Flow
-# =========================
-if st.session_state.auth_role == "force_change":
-    st.warning("⚠️ You must change your password before continuing.")
-    new_pw = st.text_input("New Password", type="password")
-    confirm_pw = st.text_input("Confirm New Password", type="password")
-    if st.button("Update Password"):
-        if new_pw and new_pw == confirm_pw:
-            if update_password(st.session_state.auth_email, new_pw):
-                st.success("✅ Password updated. Please log in again.")
-                st.session_state.auth_email = ""
-                st.session_state.auth_role = ""
-                _rerun()
-        else:
-            st.error("❌ Passwords do not match.")
-    st.stop()
 
 
 # =========================
