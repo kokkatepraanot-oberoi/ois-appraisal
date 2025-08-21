@@ -626,6 +626,9 @@ rating_map = {
 }
 
 df = load_responses_df()
+# Drop long-text fields (reflection, comments, etc.)
+reflection_cols = [c for c in df.columns if "Reflection" in c or "Comment" in c or "Goal" in c]
+df = df.drop(columns=reflection_cols, errors="ignore")
 
 # Make a display copy with acronyms
 display_df = df.copy()
