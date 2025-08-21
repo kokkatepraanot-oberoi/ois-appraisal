@@ -405,8 +405,8 @@ else:
             client_secret=client_secret,
             auth_url="https://accounts.google.com/o/oauth2/auth",
             token_url="https://oauth2.googleapis.com/token",
-            refresh_token_url="https://oauth2.googleapis.com/token",
         )
+
 
         token = oauth2.authorize_button(
             name="Login with Google",
