@@ -336,12 +336,6 @@ def authenticate_user(email, password):
 # =========================
 # AUTH: Login / Logout
 # =========================
-from authlib.integrations.requests_client import OAuth2Session
-import jwt  # from PyJWT
-
-DEFAULT_ADMIN_PASSWORD = "OIS2025"
-DEFAULT_SADMIN_PASSWORD = "SOIS2025"
-
 if "auth_email" not in st.session_state:
     st.session_state.auth_email = ""
 if "auth_name" not in st.session_state:
@@ -350,110 +344,39 @@ if "auth_role" not in st.session_state:
     st.session_state.auth_role = ""
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
-if "token" not in st.session_state:
-    st.session_state.token = None
 
 st.sidebar.header("Account")
 
-# --- Logout ---
 if st.session_state.auth_email:
     st.sidebar.success(
         f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}** "
         f"({st.session_state.auth_role})"
     )
     if st.sidebar.button("Logout"):
-        for key in ["auth_email", "auth_name", "auth_role", "submitted", "token"]:
-            st.session_state[key] = "" if key != "token" else None
+        st.session_state.auth_email = ""
+        st.session_state.auth_name = ""
+        st.session_state.auth_role = ""
+        st.session_state.submitted = False
         _rerun()
-
 else:
-    # --- Admin/Superadmin login ---
-    st.sidebar.subheader("🔑 Admin / Superadmin Login")
-    email_input = st.sidebar.text_input("School email").strip().lower()
-    password_input = st.sidebar.text_input("Password", type="password")
+    email_input = st.sidebar.text_input(
+        "School email (e.g., firstname.lastname@oberoi-is.org)"
+    ).strip().lower()
+    password_input = st.sidebar.text_input(
+        "Password (Admins/Super Admins only)", type="password"
+    )
 
-    if st.sidebar.button("Login as Admin/Superadmin"):
+    if st.sidebar.button("Login"):
         role, me = authenticate_user(email_input, password_input)
-        if role in {"admin", "sadmin"}:
+
+        if role:
             st.session_state.auth_email = email_input
             st.session_state.auth_name = me.get("Name", "")
             st.session_state.auth_role = role
             st.sidebar.success(f"✅ {role.capitalize()} login successful.")
             _rerun()
         else:
-            st.sidebar.error("Invalid credentials for Admin/Superadmin.")
-
-    # --- Teacher login via Google OAuth ---
-    st.sidebar.subheader("👩‍🏫 Teacher Login (Google)")
-
-    try:
-        client_id = st.secrets["google_oauth"]["client_id"]
-        client_secret = st.secrets["google_oauth"]["client_secret"]
-        redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
-
-        auth_url = "https://accounts.google.com/o/oauth2/auth"
-        token_url = "https://oauth2.googleapis.com/token"
-
-        if not st.session_state.token:
-            oauth = OAuth2Session(
-                client_id,
-                client_secret,
-                scope="openid email profile",
-                redirect_uri=redirect_uri
-            )
-
-            authorization_url, state = oauth.create_authorization_url(
-                auth_url,
-                access_type="offline",
-                prompt="consent"
-            )
-
-            # --- Sidebar link ---
-            st.sidebar.markdown(f"[Login with Google]({authorization_url})")
-
-            query_params = st.query_params  # modern API
-            if "code" in query_params:
-                code = query_params["code"][0]
-                token = oauth.fetch_token(token_url, code=code)
-                st.session_state.token = token
-                st.rerun()
-        else:
-            # Refresh if expired and refresh_token present
-            oauth = OAuth2Session(client_id, client_secret, redirect_uri=redirect_uri)
-            token = st.session_state.token
-            if oauth.token.is_expired() and "refresh_token" in token:
-                token = oauth.refresh_token(token_url, refresh_token=token["refresh_token"])
-                st.session_state.token = token
-
-            id_token = token.get("id_token")
-            if id_token:
-                user_info = jwt.decode(id_token, options={"verify_signature": False})
-                google_email = user_info.get("email", "").lower()
-
-                match = users_df[users_df["Email"].str.lower() == google_email]
-                if not match.empty and match.iloc[0].get("Role", "").lower() == "user":
-                    st.session_state.auth_email = google_email
-                    st.session_state.auth_name = match.iloc[0].get("Name", "")
-                    st.session_state.auth_role = "user"
-
-                    # 🚀 Redirect straight to Self-Assessment form
-                    st.success(f"✅ Welcome {st.session_state.auth_name}, opening your Self-Assessment form...")
-                    st.session_state.submitted = False
-                    st.rerun()
-                else:
-                    st.sidebar.error("Not authorized as Teacher.")
-    except Exception as e:
-        st.sidebar.warning("⚠️ Google login not configured. Add OAuth secrets to enable Teacher login.")
-        st.sidebar.caption(f"Debug: {e}")
-
-
-# =========================
-# AUTO-REDIRECT FOR TEACHERS
-# =========================
-if st.session_state.auth_role == "user":
-    # Call your self-assessment form
-    show_self_assessment_form()
-    st.stop()
+            st.sidebar.error("❌ Invalid email or password.")
 
 
 # =========================
