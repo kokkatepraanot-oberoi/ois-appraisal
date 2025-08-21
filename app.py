@@ -511,33 +511,33 @@ if tab == "Admin" and i_am_admin:
 
        st.subheader("📋 Summary of Assigned Teachers")
 
-resp_df = load_responses_df()
-summary_rows = []
-
-submitted_count = 0
-total_count = len(assigned)
-
-for _, teacher in assigned.iterrows():
-    teacher_email = teacher["Email"].strip().lower()
-    teacher_name = teacher["Name"]
-
-    submissions = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
-    if submissions.empty:
-        status = "❌ Not Submitted"
-        last_date = "-"
-    else:
-        status = "✅ Submitted"
-        last_date = submissions["Timestamp"].max()
-        submitted_count += 1
-
-    summary_rows.append({
-        "Teacher": teacher_name,
-        "Email": teacher_email,
-        "Status": status,
-        "Last Submission": last_date,
-    })
-
-summary_df = pd.DataFrame(summary_rows)
+        resp_df = load_responses_df()
+        summary_rows = []
+        
+        submitted_count = 0
+        total_count = len(assigned)
+        
+        for _, teacher in assigned.iterrows():
+            teacher_email = teacher["Email"].strip().lower()
+            teacher_name = teacher["Name"]
+        
+            submissions = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
+            if submissions.empty:
+                status = "❌ Not Submitted"
+                last_date = "-"
+            else:
+                status = "✅ Submitted"
+                last_date = submissions["Timestamp"].max()
+                submitted_count += 1
+        
+            summary_rows.append({
+                "Teacher": teacher_name,
+                "Email": teacher_email,
+                "Status": status,
+                "Last Submission": last_date,
+            })
+        
+        summary_df = pd.DataFrame(summary_rows)
 
 # Compact progress display
 col1, col2 = st.columns([1,2])
