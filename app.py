@@ -283,17 +283,33 @@ if st.session_state.auth_email:
         _rerun()
 else:
     email_input = st.sidebar.text_input("School email (e.g., firstname.lastname@oberoi-is.org)").strip().lower()
+    password_input = st.sidebar.text_input("Password (admins only)", type="password")
+
     login = st.sidebar.button("Login")
     if login:
         if email_input and not users_df.empty and "Email" in users_df.columns:
             match = users_df[users_df["Email"] == email_input]
             if not match.empty:
-                st.session_state.auth_email = email_input
-                st.session_state.auth_name = match.iloc[0].get("Name","")
-                st.success("Logged in.")
-                _rerun()
+                role = match.iloc[0].get("Role", "").lower()
+                stored_pw = match.iloc[0].get("Password", "").strip()
+
+                if role == "admin":
+                    if password_input and password_input == stored_pw:
+                        st.session_state.auth_email = email_input
+                        st.session_state.auth_name = match.iloc[0].get("Name","")
+                        st.success("Admin login successful.")
+                        _rerun()
+                    else:
+                        st.sidebar.error("Invalid admin password.")
+                else:
+                    # teacher login (no password required)
+                    st.session_state.auth_email = email_input
+                    st.session_state.auth_name = match.iloc[0].get("Name","")
+                    st.success("Teacher login successful.")
+                    _rerun()
             else:
                 st.sidebar.error("Email not found in Users sheet.")
+
 
 # =========================
 # Sidebar: Live progress (no API calls)
