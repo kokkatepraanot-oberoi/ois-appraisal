@@ -315,19 +315,19 @@ def authenticate_user(email, password):
 
     # Role-based password check
     if role == "admin":
-        if password == DEFAULT_ADMIN_PASSWORD:
+        if password == "OIS2025":
             return "admin", user_row.iloc[0]
         else:
             return None, None
 
     elif role == "sadmin":  # super admin
-        if password == DEFAULT_SADMIN_PASSWORD:
+        if password == "SOIS2025":
             return "sadmin", user_row.iloc[0]
         else:
             return None, None
 
     elif role == "user":  # teachers
-        # Teachers don’t use password here
+        # Teachers don’t need a password (email match is enough)
         return "user", user_row.iloc[0]
 
     return None, None
@@ -362,8 +362,8 @@ if st.session_state.auth_email:
         f"({st.session_state.auth_role})"
     )
     if st.sidebar.button("Logout"):
-        for key in ["auth_email","auth_name","auth_role","submitted","token"]:
-            st.session_state[key] = "" if key!="token" else None
+        for key in ["auth_email", "auth_name", "auth_role", "submitted", "token"]:
+            st.session_state[key] = "" if key != "token" else None
         _rerun()
 
 else:
@@ -374,7 +374,7 @@ else:
 
     if st.sidebar.button("Login as Admin/Superadmin"):
         role, me = authenticate_user(email_input, password_input)
-        if role in {"admin","sadmin"}:
+        if role in {"admin", "sadmin"}:
             st.session_state.auth_email = email_input
             st.session_state.auth_name = me.get("Name", "")
             st.session_state.auth_role = role
@@ -408,16 +408,17 @@ else:
                 prompt="consent"
             )
 
+            # --- Sidebar link ---
             st.sidebar.markdown(f"[Login with Google]({authorization_url})")
 
-            query_params = st.query_params
+            query_params = st.query_params  # modern API
             if "code" in query_params:
                 code = query_params["code"][0]
                 token = oauth.fetch_token(token_url, code=code)
                 st.session_state.token = token
                 st.rerun()
         else:
-            # Refresh if expired
+            # Refresh if expired and refresh_token present
             oauth = OAuth2Session(client_id, client_secret, redirect_uri=redirect_uri)
             token = st.session_state.token
             if oauth.token.is_expired() and "refresh_token" in token:
@@ -429,19 +430,30 @@ else:
                 user_info = jwt.decode(id_token, options={"verify_signature": False})
                 google_email = user_info.get("email", "").lower()
 
-                # Check in Users sheet
                 match = users_df[users_df["Email"].str.lower() == google_email]
                 if not match.empty and match.iloc[0].get("Role", "").lower() == "user":
                     st.session_state.auth_email = google_email
                     st.session_state.auth_name = match.iloc[0].get("Name", "")
                     st.session_state.auth_role = "user"
-                    _rerun()  # 👈 immediately rerun into teacher flow
+
+                    # 🚀 Redirect straight to Self-Assessment form
+                    st.success(f"✅ Welcome {st.session_state.auth_name}, opening your Self-Assessment form...")
+                    st.session_state.submitted = False
+                    st.rerun()
                 else:
                     st.sidebar.error("Not authorized as Teacher.")
-
     except Exception as e:
         st.sidebar.warning("⚠️ Google login not configured. Add OAuth secrets to enable Teacher login.")
         st.sidebar.caption(f"Debug: {e}")
+
+
+# =========================
+# AUTO-REDIRECT FOR TEACHERS
+# =========================
+if st.session_state.auth_role == "user":
+    # Call your self-assessment form
+    show_self_assessment_form()
+    st.stop()
 
 
 # =========================
