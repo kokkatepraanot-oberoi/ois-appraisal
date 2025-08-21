@@ -371,9 +371,8 @@ if tab == "Self-Assessment":
         st.sidebar.info(f"Your appraiser: **{appraiser}**")
 
         # 🔹 Load draft if exists
-        draft_data = load_draft(st.session_state.auth_email)
+        draft_data = load_draft(st.session_state.auth_email) or {}
         if draft_data:
-            st.session_state.form_data = draft_data
             st.info("💾 A saved draft was found and preloaded. You can continue where you left off.")
 
         # Selections (direct widgets so sidebar progress updates live)
@@ -383,42 +382,44 @@ if tab == "Self-Assessment":
             with st.expander(domain, expanded=False):
                 for code, label in items:
                     key = f"{code}-{label}"
+                    saved_value = draft_data.get(f"{code} {label}", "")
                     selections[f"{code} {label}"] = st.radio(
                         f"{code} — {label}",
                         RATINGS,
-                        index=None,
+                        index=RATINGS.index(saved_value) if saved_value in RATINGS else None,
                         key=key,
                     ) or ""
                 if ENABLE_REFLECTIONS:
+                    saved_refl = draft_data.get(f"Reflection-{domain}", "")
                     reflections[domain] = st.text_area(
                         f"{domain} Reflection (optional)",
                         key=f"refl-{domain}",
                         placeholder="Notes / evidence / next steps (optional)",
+                        value=saved_refl,
                     )
 
         # Submit button + progress
         selected_count = sum(1 for v in selections.values() if v)
-        col1, col2, col3 = st.columns([1,2,2])
-
+        col1, col2 = st.columns([1,3])
         with col1:
-            submit = st.button("✅ Submit")
-        
+            submit = st.button("✅ Submit", disabled=(selected_count < total_items))
+            save_draft_btn = st.button("💾 Save Draft Now")
         with col2:
-            if st.button("💾 Save Draft Now"):
-                current_data = {f"{code} {label}": selections[f"{code} {label}"] for domain, items in DOMAINS.items() for code, label in items}
-                if ENABLE_REFLECTIONS:
-                    for domain in DOMAINS:
-                        current_data[f"{domain} Reflection"] = reflections.get(domain, "")
-                if save_draft(st.session_state.auth_email, current_data):
-                    st.success("Draft saved! You can return later to continue.")
-        
-        with col3:
             st.write(f"**Progress:** {selected_count}/{total_items} completed")
 
+        # Handle Save Draft
+        if save_draft_btn:
+            draft_payload = {}
+            for domain, items in DOMAINS.items():
+                for code, label in items:
+                    draft_payload[f"{code} {label}"] = selections[f"{code} {label}"]
+                if ENABLE_REFLECTIONS:
+                    draft_payload[f"Reflection-{domain}"] = reflections.get(domain, "")
+            save_draft(st.session_state.auth_email, draft_payload)
+            st.success("✅ Draft saved successfully!")
 
-        
+        # Handle Submit
         if submit:
-            # At this point we already know all strands are filled
             row = [
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 st.session_state.auth_email,
@@ -430,7 +431,7 @@ if tab == "Self-Assessment":
                     row.append(selections[f"{code} {label}"])
                 if ENABLE_REFLECTIONS:
                     row.append(reflections.get(domain, ""))
-        
+
             try:
                 with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
                 load_responses_df.clear()
