@@ -447,15 +447,53 @@ if tab == "Admin" and i_am_admin:
     if assigned.empty:
         st.info("No teachers are currently assigned to you in the Users sheet.")
     else:
+        st.subheader("📋 Summary of Assigned Teachers")
+
+        resp_df = load_responses_df()
+
+        summary_rows = []
+        for _, teacher in assigned.iterrows():
+            teacher_email = teacher["Email"].strip().lower()
+            teacher_name = teacher["Name"]
+
+            submissions = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
+            if submissions.empty:
+                status = "❌ Not Submitted"
+                last_date = "-"
+            else:
+                status = "✅ Submitted"
+                last_date = submissions["Timestamp"].max()
+
+            summary_rows.append({
+                "Teacher": teacher_name,
+                "Email": teacher_email,
+                "Status": status,
+                "Last Submission": last_date,
+            })
+
+        summary_df = pd.DataFrame(summary_rows)
+        st.dataframe(summary_df, use_container_width=True)
+
+        # Optional: download summary
+        csv = summary_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "⬇️ Download Summary (CSV)",
+            data=csv,
+            file_name=f"{my_first}_summary.csv",
+            mime="text/csv"
+        )
+
+        st.divider()
+
+        st.subheader("🔎 View Individual Submissions")
         teacher_choice = st.selectbox(
-            "Select a teacher to view their submission",
+            "Select a teacher",
             assigned["Name"].tolist()
         )
 
         if teacher_choice:
-            df = load_responses_df()
             teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
-            rows = df[df["Email"] == teacher_email] if not df.empty else pd.DataFrame()
+            rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
 
             if rows.empty:
                 st.warning(f"No submission found for {teacher_choice}.")
@@ -466,7 +504,7 @@ if tab == "Admin" and i_am_admin:
 
                 csv = rows.to_csv(index=False).encode("utf-8")
                 st.download_button(
-                    f"Download all submissions for {teacher_choice}",
+                    f"⬇️ Download all submissions for {teacher_choice}",
                     data=csv,
                     file_name=f"{teacher_choice}_submissions.csv",
                     mime="text/csv"
@@ -475,4 +513,3 @@ if tab == "Admin" and i_am_admin:
     if st.button("🔄 Refresh Admin Data"):
         load_responses_df.clear()
         _rerun()
-
