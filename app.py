@@ -163,6 +163,45 @@ def get_worksheets():
         st.stop()
 
 RESP_WS, USERS_WS = get_worksheets()
+# =========================
+# DRAFT HELPERS
+# =========================
+import json
+
+def save_draft(email, form_data):
+    """Save teacher's draft into Drafts sheet."""
+    try:
+        draft_ws = gspread.authorize(
+            Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
+        ).open_by_key(SPREADSHEET_ID).worksheet("Drafts")
+
+        df = pd.DataFrame([{"Email": email, **form_data}])
+
+        # Remove old draft for this email if exists
+        all_drafts = pd.DataFrame(draft_ws.get_all_records())
+        all_drafts = all_drafts[all_drafts["Email"] != email]
+        all_drafts = pd.concat([all_drafts, df], ignore_index=True)
+
+        draft_ws.clear()
+        draft_ws.update([all_drafts.columns.values.tolist()] + all_drafts.values.tolist())
+        return True
+    except Exception as e:
+        st.error(f"⚠️ Could not save draft: {e}")
+        return False
+
+def load_draft(email):
+    """Load teacher's draft if exists."""
+    try:
+        draft_ws = gspread.authorize(
+            Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
+        ).open_by_key(SPREADSHEET_ID).worksheet("Drafts")
+        all_drafts = pd.DataFrame(draft_ws.get_all_records())
+        user_draft = all_drafts[all_drafts["Email"] == email]
+        if not user_draft.empty:
+            return dict(user_draft.iloc[0])
+    except:
+        return {}
+    return {}
 
 # =========================
 # HEADER MANAGEMENT (safe, non-destructive)
@@ -684,37 +723,4 @@ if tab == "Super Admin" and i_am_sadmin:
             "text/csv"
         )
 
-# ------------------------
-# DRAFT HELPERS
-# ------------------------
-def save_draft(email, form_data):
-    """Save teacher's draft into Drafts sheet."""
-    try:
-        draft_ws = client.open_by_key(SPREADSHEET_ID).worksheet("Drafts")
-        df = pd.DataFrame([{"Email": email, **form_data}])
-
-        # Remove old draft for this email if exists
-        all_drafts = pd.DataFrame(draft_ws.get_all_records())
-        all_drafts = all_drafts[all_drafts["Email"] != email]
-        all_drafts = pd.concat([all_drafts, df], ignore_index=True)
-
-        draft_ws.clear()
-        draft_ws.update([all_drafts.columns.values.tolist()] + all_drafts.values.tolist())
-        return True
-    except Exception as e:
-        st.error(f"⚠️ Could not save draft: {e}")
-        return False
-
-
-def load_draft(email):
-    """Load teacher's draft if exists."""
-    try:
-        draft_ws = client.open_by_key(SPREADSHEET_ID).worksheet("Drafts")
-        all_drafts = pd.DataFrame(draft_ws.get_all_records())
-        user_draft = all_drafts[all_drafts["Email"] == email]
-        if not user_draft.empty:
-            return dict(user_draft.iloc[0])
-    except:
-        return {}
-    return {}
 
