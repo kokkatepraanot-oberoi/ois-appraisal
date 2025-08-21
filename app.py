@@ -257,10 +257,10 @@ def _pick_col(candidates: list[str], cols: list[str]):
 def load_users_once_df():
     records = with_backoff(USERS_WS.get_all_records)
     if not records:
-        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role"])
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role", "Password"])
     df = pd.DataFrame(records)
     if df.empty:
-        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role"])
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role", "Password"])
 
     cols = list(df.columns)
 
@@ -268,6 +268,7 @@ def load_users_once_df():
     name_header = _pick_col(["name","full name","teacher name","staff name"], cols)
     appraiser_header = _pick_col(["appraiser","line manager","manager","appraiser name","supervisor"], cols)
     role_header = _pick_col(["role","access","admin"], cols)
+    password_header = _pick_col(["password","pwd","pass"], cols)   # 👈 NEW
 
     out = pd.DataFrame()
     out["Email"] = df[email_header].astype(str).str.strip().str.lower() if email_header else ""
@@ -275,7 +276,10 @@ def load_users_once_df():
     out["Appraiser"] = (df[appraiser_header].astype(str).str.strip().replace({"": "Not Assigned"})
                         if appraiser_header else "Not Assigned")
     out["Role"] = df[role_header].astype(str).str.strip().str.lower() if role_header else ""
+    out["Password"] = df[password_header].astype(str).str.strip() if password_header else ""  # 👈 NEW
+
     return out
+
 
 users_df = load_users_once_df()
 
