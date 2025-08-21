@@ -427,3 +427,50 @@ if tab == "My Submission":
     if st.button("🔄 Refresh"):
         load_responses_df.clear()
         _rerun()
+
+# =========================
+# Page: Admin Panel
+# =========================
+if tab == "Admin" and i_am_admin:
+    st.header("👩‍💼 Admin Panel")
+
+    # Which admin am I?
+    me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0]
+    my_name = me.get("Name", st.session_state.auth_email)
+
+    # Teachers assigned to me
+    assigned = users_df[users_df["Appraiser"].str.lower() == my_name.strip().lower()] \
+        if not users_df.empty else pd.DataFrame()
+
+    if assigned.empty:
+        st.info("No teachers are currently assigned to you in the Users sheet.")
+    else:
+        teacher_choice = st.selectbox(
+            "Select a teacher to view their submission",
+            assigned["Name"].tolist()
+        )
+
+        if teacher_choice:
+            df = load_responses_df()
+            teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
+            rows = df[df["Email"] == teacher_email] if not df.empty else pd.DataFrame()
+
+            if rows.empty:
+                st.warning(f"No submission found for {teacher_choice}.")
+            else:
+                st.subheader(f"Latest submission for {teacher_choice}")
+                latest = rows.sort_values("Timestamp", ascending=False).head(1)
+                st.dataframe(latest, use_container_width=True)
+
+                csv = rows.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    f"Download all submissions for {teacher_choice}",
+                    data=csv,
+                    file_name=f"{teacher_choice}_submissions.csv",
+                    mime="text/csv"
+                )
+
+    if st.button("🔄 Refresh Admin Data"):
+        load_responses_df.clear()
+        _rerun()
+
