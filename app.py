@@ -556,78 +556,92 @@ if tab == "My Submission":
 # =========================
 # Page: Admin Panel (Admin & Super Admin)
 # =========================
-elif tab == "Admin Panel" and i_am_admin:
+if tab == "Admin" and i_am_admin:
     st.header("👩‍💼 Admin Panel")
 
-    # Figure out my role
     me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0]
+    my_name = me.get("Name", st.session_state.auth_email)
     my_role = me.get("Role", "").strip().lower()
-    my_name = me.get("Name", st.session_state.auth_name)
+    my_first = my_name.split()[0].strip().lower()
 
-    # Decide scope
+    # Admins only see their assigned teachers, Super Admin sees all
     if my_role == "sadmin":
-        view_df = responses_df.copy()
+        assigned = users_df[users_df["Role"] == "user"]  # all teachers
         st.info("Super Admin access: viewing **all teachers** in the school.")
     else:
-        admin_first = my_name.split()[0].strip().lower()
-        view_df = responses_df[
-            responses_df["Appraiser"].str.strip().str.lower() == admin_first
-        ]
-        st.info("Admin access: viewing only **your appraisees**.")
+        assigned = users_df[
+            users_df["Appraiser"].str.strip().str.lower() == my_first
+        ] if not users_df.empty else pd.DataFrame()
 
-    if view_df.empty:
-        st.info("ℹ️ No submissions yet.")
+    if assigned.empty:
+        st.info("No teachers found for your role in the Users sheet.")
     else:
-        # 🔹 Color coding
-        colors = {
-            "HE": "background-color: #a8e6a1;",   # green
-            "E": "background-color: #d0f0fd;",    # blue
-            "IN": "background-color: #fff3b0;",   # yellow
-            "DNMS": "background-color: #f8a5a5;"  # red
-        }
-        def color_map(val): return colors.get(val, "")
+        st.subheader("📋 Summary of Teachers")
 
-        rubric_cols = [c for c in view_df.columns if c not in ["Timestamp","Email","Name","Appraiser"]]
-        styled_df = view_df.style.applymap(color_map, subset=rubric_cols)
+        resp_df = load_responses_df()
+        summary_rows = []
 
-        st.subheader("📊 Submissions Grid")
-        st.dataframe(styled_df, use_container_width=True)
+        submitted_count = 0
+        total_count = len(assigned)
 
-        # Download
-        fname = "all_teachers.csv" if my_role == "sadmin" else f"{st.session_state.auth_name}_appraisees.csv"
-        st.download_button(
-            "📥 Download Data (CSV)",
-            data=view_df.to_csv(index=False).encode("utf-8"),
-            file_name=fname,
-            mime="text/csv",
-        )
+        for _, teacher in assigned.iterrows():
+            teacher_email = teacher["Email"].strip().lower()
+            teacher_name = teacher["Name"]
 
-        # Progress
-        st.divider()
-        st.subheader("📋 Progress Summary")
-        total = len(users_df[users_df["Role"] == "user"]) if my_role == "sadmin" else len(users_df[users_df["Appraiser"].str.strip().str.lower() == admin_first])
-        submitted = len(view_df)
+            submissions = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
+            if submissions.empty:
+                status = "❌ Not Submitted"
+                last_date = "-"
+            else:
+                status = "✅ Submitted"
+                last_date = submissions["Timestamp"].max()
+                submitted_count += 1
+
+            summary_rows.append({
+                "Teacher": teacher_name,
+                "Email": teacher_email,
+                "Status": status,
+                "Last Submission": last_date,
+            })
+
+        summary_df = pd.DataFrame(summary_rows)
+
+        # Compact progress display
         col1, col2 = st.columns([1,2])
         with col1:
-            st.markdown(f"**Progress:** {submitted}/{total} submitted ({round((submitted/total)*100,1)}%)")
+            st.markdown(
+                f"**Progress:** {submitted_count}/{total_count} submitted  "
+                f"({round((submitted_count/total_count)*100,1)}%)"
+            )
         with col2:
-            st.progress(submitted/total if total else 0)
+            st.progress(submitted_count / total_count if total_count else 0)
 
-        # Individual submissions
+        st.dataframe(summary_df, use_container_width=True)
+
+        # Dropdown for deep dive
         st.divider()
         st.subheader("🔎 View Individual Submissions")
-        teacher_choice = st.selectbox("Select a teacher", view_df["Name"].unique())
-        if teacher_choice:
-            rows = view_df[view_df["Name"] == teacher_choice].sort_values("Timestamp", ascending=False)
-            latest = rows.head(1)
-            st.dataframe(latest, use_container_width=True)
 
-            st.download_button(
-                f"⬇️ Download all submissions for {teacher_choice}",
-                data=rows.to_csv(index=False).encode("utf-8"),
-                file_name=f"{teacher_choice}_submissions.csv",
-                mime="text/csv"
-            )
+        teacher_choice = st.selectbox("Select a teacher", assigned["Name"].tolist())
+
+        if teacher_choice:
+            teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
+            rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
+
+            if rows.empty:
+                st.warning(f"No submission found for {teacher_choice}.")
+            else:
+                st.subheader(f"Latest submission for {teacher_choice}")
+                latest = rows.sort_values("Timestamp", ascending=False).head(1)
+                st.dataframe(latest, use_container_width=True)
+
+                csv = rows.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    f"⬇️ Download all submissions for {teacher_choice}",
+                    data=csv,
+                    file_name=f"{teacher_choice}_submissions.csv",
+                    mime="text/csv"
+                )
 
     if st.button("🔄 Refresh Admin Data"):
         load_responses_df.clear()
