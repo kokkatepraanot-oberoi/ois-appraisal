@@ -534,11 +534,32 @@ if tab == "My Submission":
     if my.empty:
         st.info("No submission found yet.")
     else:
-        my_sorted = my.sort_values("Timestamp", ascending=False)
-        latest = my_sorted.head(1)
+        st.subheader(f"Latest submission for {teacher_choice}")
+        latest = rows.sort_values("Timestamp", ascending=False).head(1)
+        
+        # 🔹 Replace full text with acronyms
+        mapping = {
+            "Highly Effective": "HE",
+            "Effective": "E",
+            "Improvement Necessary": "IN",
+            "Does Not Meet Standards": "DNMS"
+        }
+        latest = latest.replace(mapping)
+        
+        # 🔹 Apply same colors
+        def highlight_ratings(val):
+            colors = {
+                "HE": "background-color: #a8e6a1;",   # green
+                "E": "background-color: #d0f0fd;",    # blue
+                "IN": "background-color: #fff3b0;",   # yellow
+                "DNMS": "background-color: #f8a5a5;"  # red
+            }
+            return colors.get(val, "")
+        
+        styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
+        
+        st.dataframe(styled_latest, use_container_width=True)
 
-        st.success("✅ You have already submitted your self-assessment. Here is your latest submission:")
-        st.dataframe(latest, use_container_width=True)
 
         # download button with all submissions
         csv = my_sorted.to_csv(index=False).encode("utf-8")
