@@ -450,8 +450,11 @@ if tab == "Admin" and i_am_admin:
         st.subheader("📋 Summary of Assigned Teachers")
 
         resp_df = load_responses_df()
-
         summary_rows = []
+
+        submitted_count = 0
+        total_count = len(assigned)
+
         for _, teacher in assigned.iterrows():
             teacher_email = teacher["Email"].strip().lower()
             teacher_name = teacher["Name"]
@@ -463,6 +466,7 @@ if tab == "Admin" and i_am_admin:
             else:
                 status = "✅ Submitted"
                 last_date = submissions["Timestamp"].max()
+                submitted_count += 1
 
             summary_rows.append({
                 "Teacher": teacher_name,
@@ -472,6 +476,14 @@ if tab == "Admin" and i_am_admin:
             })
 
         summary_df = pd.DataFrame(summary_rows)
+
+        # Progress counter
+        st.metric(
+            label="Submission Progress",
+            value=f"{submitted_count}/{total_count} teachers submitted",
+            delta=f"{round((submitted_count/total_count)*100,1)}% complete" if total_count else "0%"
+        )
+
         st.dataframe(summary_df, use_container_width=True)
 
         # Optional: download summary
