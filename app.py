@@ -300,6 +300,38 @@ def user_has_submission(email: str) -> bool:
     df = load_responses_df()
     return (not df.empty) and ("Email" in df.columns) and (not df[df["Email"] == email.strip().lower()].empty)
 
+# =========================
+# Authentication & Roles
+# =========================
+def authenticate_user(email, password):
+    email = email.strip().lower()
+
+    # Look up in Users sheet
+    user_row = users_df[users_df["Email"].str.lower() == email]
+    if user_row.empty:
+        return None, None  # not found
+
+    role = user_row.iloc[0]["Role"].strip().lower()
+
+    # Role-based password check
+    if role == "admin":
+        if password == "OIS2025":
+            return "admin", user_row.iloc[0]
+        else:
+            return None, None
+
+    elif role == "sadmin":  # super admin
+        if password == "SOIS2025":
+            return "sadmin", user_row.iloc[0]
+        else:
+            return None, None
+
+    elif role == "user":  # teachers
+        # Teachers don’t need a password (email match is enough)
+        return "user", user_row.iloc[0]
+
+    return None, None
+
 
 # =========================
 # AUTH: Login / Logout
