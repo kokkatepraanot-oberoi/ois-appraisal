@@ -322,17 +322,18 @@ if not st.session_state.auth_email:
 already_submitted = user_has_submission(st.session_state.auth_email)
 i_am_admin = is_admin(st.session_state.auth_email)
 
-# If the teacher already submitted, hide the Self‑Assessment tab (admins still see it)
-if already_submitted and not i_am_admin:
-    st.success("Submission on file. You can view it under **My Submission**.")
-    nav_options = ["My Submission"]
-else:
-    nav_options = ["Self‑Assessment", "My Submission"]
-
 if i_am_admin:
-    nav_options.append("Admin")
+    # Admins should only see Admin panel
+    nav_options = ["Admin"]
+else:
+    if already_submitted:
+        st.success("Submission on file. You can view it under **My Submission**.")
+        nav_options = ["My Submission"]
+    else:
+        nav_options = ["Self-Assessment", "My Submission"]
 
 tab = st.sidebar.radio("Menu", nav_options, index=0)
+
 
 # =========================
 # Page: Self‑Assessment
