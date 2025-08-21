@@ -27,6 +27,8 @@ if "token" not in st.session_state:
 
     # Step 2: Once redirected back, capture `code`
     query_params = st.experimental_get_query_params()
+    # Step 2: Once redirected back, capture `code`
+    query_params = st.query_params
     if "code" in query_params:
         code = query_params["code"][0]
         token = oauth.fetch_token(
@@ -34,7 +36,8 @@ if "token" not in st.session_state:
             code=code
         )
         st.session_state["token"] = token
-        st.experimental_rerun()
+        st.rerun()
+
 
 else:
     token = st.session_state["token"]
