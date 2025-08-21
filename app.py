@@ -274,6 +274,9 @@ if "submitted" not in st.session_state:
 
 # ---- Sidebar: Login box ----
 st.sidebar.header("Account")
+
+DEFAULT_ADMIN_PASSWORD = "OIS2025"  # 🔒 default password for all admins
+
 if st.session_state.auth_email:
     st.sidebar.success(f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}**")
     if st.sidebar.button("Logout"):
@@ -291,13 +294,12 @@ else:
             match = users_df[users_df["Email"] == email_input]
             if not match.empty:
                 role = match.iloc[0].get("Role", "").lower()
-                stored_pw = match.iloc[0].get("Password", "").strip()
 
                 if role == "admin":
-                    if password_input and password_input == stored_pw:
+                    if password_input == DEFAULT_ADMIN_PASSWORD:
                         st.session_state.auth_email = email_input
                         st.session_state.auth_name = match.iloc[0].get("Name","")
-                        st.success("Admin login successful.")
+                        st.success("✅ Admin login successful.")
                         _rerun()
                     else:
                         st.sidebar.error("Invalid admin password.")
@@ -305,7 +307,7 @@ else:
                     # teacher login (no password required)
                     st.session_state.auth_email = email_input
                     st.session_state.auth_name = match.iloc[0].get("Name","")
-                    st.success("Teacher login successful.")
+                    st.success("✅ Teacher login successful.")
                     _rerun()
             else:
                 st.sidebar.error("Email not found in Users sheet.")
