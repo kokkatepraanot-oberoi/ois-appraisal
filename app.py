@@ -618,46 +618,47 @@ if tab == "Admin" and i_am_admin:
 
         st.dataframe(summary_df, use_container_width=True)
 
-        # 🔹 NEW: Full Grid for Admin’s appraisees (color coded like Super Admin)
-st.divider()
-st.subheader("📊 Submissions Grid (My Appraisees)")
+        # 🔹 Submissions Grid (My Appraisees) with color coding
+        st.divider()
+        st.subheader("📊 Submissions Grid (My Appraisees)")
+        
+        if not resp_df.empty:
+            appraisee_emails = assigned["Email"].str.strip().str.lower().tolist()
+            df = resp_df[resp_df["Email"].str.strip().str.lower().isin(appraisee_emails)]
+        
+            if not df.empty:
+                # Replace full text with acronyms
+                mapping = {
+                    "Highly Effective": "HE",
+                    "Effective": "E",
+                    "Improvement Necessary": "IN",
+                    "Does Not Meet Standards": "DNMS"
+                }
+                df = df.replace(mapping)
+        
+                # Apply same colors as Super Admin
+                def highlight_ratings(val):
+                    colors = {
+                        "HE": "background-color: #a8e6a1;",   # green
+                        "E": "background-color: #d0f0fd;",    # blue
+                        "IN": "background-color: #fff3b0;",   # yellow
+                        "DNMS": "background-color: #f8a5a5;"  # red
+                    }
+                    return colors.get(val, "")
+        
+                styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
+        
+                st.dataframe(styled_df, use_container_width=True)
+        
+                st.download_button(
+                    "📥 Download My Appraisees’ Grid (CSV)",
+                    data=df.to_csv(index=False).encode("utf-8"),
+                    file_name=f"{st.session_state.auth_name}_appraisees_grid.csv",
+                    mime="text/csv",
+                )
+            else:
+                st.info("ℹ️ No rubric submissions yet from your appraisees.")
 
-if not resp_df.empty:
-    appraisee_emails = assigned["Email"].str.strip().str.lower().tolist()
-    view_df = resp_df[resp_df["Email"].str.strip().str.lower().isin(appraisee_emails)]
-
-    if not view_df.empty:
-        # Map long rating names to acronyms
-        label_map = {
-            "Highly Effective": "HE",
-            "Effective": "E",
-            "Improvement Necessary": "IN",
-            "Does Not Meet Standard": "DNMS"
-        }
-        view_df = view_df.replace(label_map)
-
-        # Define colors for acronyms
-        colors = {
-            "HE": "background-color: #a8e6a1;",   # green
-            "E": "background-color: #d0f0fd;",    # blue
-            "IN": "background-color: #fff3b0;",   # yellow
-            "DNMS": "background-color: #f8a5a5;"  # red
-        }
-        def color_map(val): return colors.get(val, "")
-
-        rubric_cols = [c for c in view_df.columns if c not in ["Timestamp","Email","Name","Appraiser"]]
-        styled_df = view_df.style.applymap(color_map, subset=rubric_cols)
-
-        st.dataframe(styled_df, use_container_width=True)
-
-        st.download_button(
-            "📥 Download My Appraisees’ Grid (CSV)",
-            data=view_df.to_csv(index=False).encode("utf-8"),
-            file_name=f"{st.session_state.auth_name}_appraisees_grid.csv",
-            mime="text/csv",
-        )
-    else:
-        st.info("ℹ️ No rubric submissions yet from your appraisees.")
 
 
         # Dropdown for deep dive
