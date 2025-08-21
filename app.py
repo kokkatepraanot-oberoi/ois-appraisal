@@ -370,6 +370,12 @@ if tab == "Self-Assessment":
         appraiser = me.get("Appraiser","Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
         st.sidebar.info(f"Your appraiser: **{appraiser}**")
 
+        # 🔹 Load draft if exists
+        draft_data = load_draft(st.session_state.auth_email)
+        if draft_data:
+            st.session_state.form_data = draft_data
+            st.info("💾 A saved draft was found and preloaded. You can continue where you left off.")
+
         # Selections (direct widgets so sidebar progress updates live)
         selections = {}
         reflections = {}
