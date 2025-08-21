@@ -402,19 +402,20 @@ else:
 
         oauth2 = OAuth2Component(
             client_id=client_id,
-            client_secret=client_secret,
             auth_url="https://accounts.google.com/o/oauth2/auth",
             token_url="https://oauth2.googleapis.com/token",
         )
-
-
 
         token = oauth2.authorize_button(
             name="Login with Google",
             icon="🔒",
             redirect_uri=redirect_uri,
             scope=["openid", "email", "profile"],
-            key="google"
+            key="google",
+            extras_params={
+                "access_type": "offline",
+                "prompt": "consent"
+            }
         )
 
         if token:
