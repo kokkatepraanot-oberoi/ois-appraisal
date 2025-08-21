@@ -174,20 +174,31 @@ RESP_WS, USERS_WS, DRAFTS_WS = get_worksheets()
 # DRAFT HELPERS
 # =========================
 def save_draft(email, form_data):
-    """Save teacher's draft into Drafts sheet."""
+    """Update or append a draft for this teacher only."""
     try:
-        df = pd.DataFrame([{"Email": email, **form_data}])
+        # Get all drafts (lightweight, header + values)
+        all_drafts = DRAFTS_WS.get_all_records()
+        emails = [row["Email"] for row in all_drafts]
 
-        all_drafts = pd.DataFrame(DRAFTS_WS.get_all_records())
-        all_drafts = all_drafts[all_drafts["Email"] != email]
-        all_drafts = pd.concat([all_drafts, df], ignore_index=True)
+        row_data = [email] + [form_data.get(f, "") for f in form_data.keys()]
 
-        DRAFTS_WS.clear()
-        DRAFTS_WS.update([all_drafts.columns.values.tolist()] + all_drafts.values.tolist())
+        if email in emails:
+            # Update existing row (Google Sheets is 1-indexed and has a header row)
+            row_num = emails.index(email) + 2  
+            DRAFTS_WS.update(f"A{row_num}", [row_data])
+        else:
+            # Append new row
+            if not all_drafts:  
+                # If sheet is empty except header, add header first
+                headers = ["Email"] + list(form_data.keys())
+                DRAFTS_WS.append_row(headers, value_input_option="USER_ENTERED")
+            DRAFTS_WS.append_row(row_data, value_input_option="USER_ENTERED")
+
         return True
     except Exception as e:
         st.error(f"⚠️ Could not save draft: {e}")
         return False
+
 
 def load_draft(email):
     """Load teacher's draft if exists."""
