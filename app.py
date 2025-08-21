@@ -336,89 +336,47 @@ def authenticate_user(email, password):
 # =========================
 # AUTH: Login / Logout
 # =========================
-import random, smtplib
-from email.mime.text import MIMEText
-
-# --- Helper: send OTP via Gmail SMTP ---
-def send_otp_email(to_email, otp):
-    try:
-        sender = st.secrets["otp_email"]["address"]
-        password = st.secrets["otp_email"]["password"]
-
-        msg = MIMEText(f"Your OIS Self-Assessment login code is: {otp}")
-        msg["Subject"] = "OIS Teacher Self-Assessment OTP"
-        msg["From"] = sender
-        msg["To"] = to_email
-
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(sender, password)
-        server.sendmail(sender, [to_email], msg.as_string())
-        server.quit()
-        return True
-    except Exception as e:
-        st.error(f"⚠️ Failed to send OTP: {e}")
-        return False
-
-# --- Session state setup ---
-if "auth_email" not in st.session_state: st.session_state.auth_email = ""
-if "auth_name" not in st.session_state: st.session_state.auth_name = ""
-if "auth_role" not in st.session_state: st.session_state.auth_role = ""
-if "otp" not in st.session_state: st.session_state.otp = None
-if "otp_sent_to" not in st.session_state: st.session_state.otp_sent_to = None
+if "auth_email" not in st.session_state:
+    st.session_state.auth_email = ""
+if "auth_name" not in st.session_state:
+    st.session_state.auth_name = ""
+if "auth_role" not in st.session_state:
+    st.session_state.auth_role = ""
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
 
 st.sidebar.header("Account")
 
-# --- Logout ---
 if st.session_state.auth_email:
     st.sidebar.success(
         f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}** "
         f"({st.session_state.auth_role})"
     )
     if st.sidebar.button("Logout"):
-        for k in ["auth_email", "auth_name", "auth_role", "otp", "otp_sent_to"]:
-            st.session_state[k] = ""
-        st.session_state.otp = None
+        st.session_state.auth_email = ""
+        st.session_state.auth_name = ""
+        st.session_state.auth_role = ""
+        st.session_state.submitted = False
         _rerun()
-
 else:
-    # --- Login form ---
-    email_input = st.sidebar.text_input("School email").strip().lower()
-    password_input = st.sidebar.text_input("Password (Admins only)", type="password")
+    email_input = st.sidebar.text_input(
+        "School email (e.g., firstname.lastname@oberoi-is.org)"
+    ).strip().lower()
+    password_input = st.sidebar.text_input(
+        "Password (Admins/Super Admins only)", type="password"
+    )
 
-    role, me = authenticate_user(email_input, password_input)
+    if st.sidebar.button("Login"):
+        role, me = authenticate_user(email_input, password_input)
 
-    if role in {"admin", "sadmin"}:
-        # Admin login with password
-        if st.sidebar.button("Login as Admin/Superadmin"):
-            if role:
-                st.session_state.auth_email = email_input
-                st.session_state.auth_name = me.get("Name", "")
-                st.session_state.auth_role = role
-                _rerun()
-            else:
-                st.sidebar.error("❌ Invalid Admin credentials.")
-
-    elif role == "user":
-        # Teacher login via OTP
-        if st.sidebar.button("Send OTP"):
-            otp = str(random.randint(100000, 999999))
-            st.session_state.otp = otp
-            st.session_state.otp_sent_to = email_input
-            if send_otp_email(email_input, otp):
-                st.sidebar.info(f"📩 OTP sent to {email_input}. Please check your inbox.")
-
-        if st.session_state.otp_sent_to == email_input:
-            otp_input = st.sidebar.text_input("Enter OTP")
-            if st.sidebar.button("Login with OTP"):
-                if otp_input == st.session_state.otp:
-                    st.session_state.auth_email = email_input
-                    st.session_state.auth_name = me.get("Name", "")
-                    st.session_state.auth_role = "user"
-                    st.session_state.otp = None  # clear OTP
-                    _rerun()
-                else:
-                    st.sidebar.error("❌ Invalid OTP. Try again.")
+        if role:
+            st.session_state.auth_email = email_input
+            st.session_state.auth_name = me.get("Name", "")
+            st.session_state.auth_role = role
+            st.sidebar.success(f"✅ {role.capitalize()} login successful.")
+            _rerun()
+        else:
+            st.sidebar.error("❌ Invalid email or password.")
 
 
 # =========================
