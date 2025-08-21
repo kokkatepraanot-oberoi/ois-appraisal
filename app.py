@@ -613,55 +613,53 @@ if tab == "Super Admin" and i_am_sadmin:
         mime="text/csv"
     )
 
-    # =========================
-# Full Grid View
 # =========================
-st.subheader("📊 Detailed Whole-School Submissions")
-rating_map = {
-    "Highly Effective": "HE",
-    "Effective": "E",
-    "Developing": "D",
-    "Improvement Necessary": "IN",
-    "Does Not Meet Standards": "DNMS"
-}
+# Super Admin: Whole-School Submissions
+# =========================
+if tab == "Super Admin" and i_am_sadmin:
+    st.subheader("📊 Detailed Whole-School Submissions")
 
-df = load_responses_df()
-# Drop long-text fields (reflection, comments, etc.)
-reflection_cols = [c for c in df.columns if "Reflection" in c or "Comment" in c or "Goal" in c]
-df = df.drop(columns=reflection_cols, errors="ignore")
+    # Fetch all responses
+    df = load_responses_df()
 
-# Make a display copy with acronyms
-display_df = df.copy()
-for full, short in rating_map.items():
-    display_df = display_df.replace(full, short)
+    if df.empty:
+        st.info("No submissions found yet.")
+    else:
+        # Remove reflections & goals for compactness
+        reflection_cols = [c for c in df.columns if "Reflection" in c or "Goal" in c or "Comment" in c]
+        df = df.drop(columns=reflection_cols, errors="ignore")
 
-if df.empty:
-    st.info("No submissions found yet.")
-else:
-    # Reset index for numbering
-    df.index = df.index + 1
-    df.index.name = "No."
+        # Reset index for numbering
+        df.index = df.index + 1
+        df.index.name = "No."
 
-    # Color mapping for ratings
-    def highlight_ratings(val):
-        colors = {
-            "HE": "background-color: #a8e6a1;",    # green
-            "E": "background-color: #d0f0fd;",     # blue
-            "D": "background-color: #fff3b0;",     # yellow
-            "IN": "background-color: #ffd6a5;",    # orange
-            "DNMS": "background-color: #f8a5a5;"   # red
+        # Replace full text with acronyms
+        mapping = {
+            "Highly Effective": "HE",
+            "Effective": "E",
+            "Improvement Necessary": "IN",
+            "Does Not Meet Standards": "DNMS"
         }
-        return colors.get(val, "")
+        df = df.replace(mapping)
 
+        # Apply colors
+        def highlight_ratings(val):
+            colors = {
+                "HE": "background-color: #a8e6a1;",   # green
+                "E": "background-color: #d0f0fd;",    # blue
+                "IN": "background-color: #fff3b0;",   # yellow
+                "DNMS": "background-color: #f8a5a5;"  # red
+            }
+            return colors.get(val, "")
 
-    styled_df = display_df.style.applymap(highlight_ratings, subset=display_df.columns[4:])
+        styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
 
+        st.dataframe(styled_df, use_container_width=True)
 
-    st.dataframe(styled_df, use_container_width=True)
-
-    st.download_button(
-        "⬇️ Download All Submissions (CSV)",
-        df.to_csv(index=True).encode("utf-8"),
-        "all_submissions.csv",
-        "text/csv"
-    )
+        # Download option
+        st.download_button(
+            "⬇️ Download all submissions (CSV)",
+            df.to_csv(index=True).encode("utf-8"),
+            "all_submissions.csv",
+            "text/csv"
+        )
