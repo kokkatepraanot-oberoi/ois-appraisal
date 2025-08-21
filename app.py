@@ -1,6 +1,5 @@
 from authlib.integrations.requests_client import OAuth2Session
 import streamlit as st
-import os
 import jwt  # from PyJWT
 
 # Load secrets
@@ -26,18 +25,15 @@ if "token" not in st.session_state:
     st.markdown(f"[Login with Google]({authorization_url})")
 
     # Step 2: Once redirected back, capture `code`
-    query_params = st.experimental_get_query_params()
-    # Step 2: Once redirected back, capture `code`
     query_params = st.query_params
     if "code" in query_params:
-        code = query_params["code"][0]
+        code = query_params["code"]  # Already string, no [0]
         token = oauth.fetch_token(
             token_url,
             code=code
         )
         st.session_state["token"] = token
         st.rerun()
-
 
 else:
     token = st.session_state["token"]
