@@ -611,3 +611,38 @@ if tab == "Super Admin" and i_am_sadmin:
         file_name="whole_school_summary.csv",
         mime="text/csv"
     )
+elif nav_selection == "Super Admin":
+    st.subheader("📊 Whole-School Submissions (Super Admin)")
+
+    # Fetch all responses
+    all_responses = responses_ws.get_all_records()
+    df = pd.DataFrame(all_responses)
+
+    if df.empty:
+        st.info("No submissions found yet.")
+    else:
+        # Reset index for numbering
+        df.index = df.index + 1
+        df.index.name = "No."
+
+        # Color mapping for ratings
+        def highlight_ratings(val):
+            colors = {
+                "Highly Effective": "background-color: #a8e6a1;",  # green
+                "Effective": "background-color: #d0f0fd;",        # blue
+                "Developing": "background-color: #fff3b0;",       # yellow
+                "Does Not Meet": "background-color: #f8a5a5;"     # red
+            }
+            return colors.get(val, "")
+
+        styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])  # apply from A1 Expertise onwards
+
+        st.dataframe(styled_df, use_container_width=True)
+
+        # Download option
+        st.download_button(
+            "⬇️ Download all submissions (CSV)",
+            df.to_csv(index=True).encode("utf-8"),
+            "all_submissions.csv",
+            "text/csv"
+        )
