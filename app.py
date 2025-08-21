@@ -566,14 +566,14 @@ elif tab == "Admin Panel" and i_am_admin:
 
     # Decide scope
     if my_role == "sadmin":
-    view_df = responses_df.copy()
-    st.info("Super Admin access: viewing **all teachers** in the school.")
-else:
-    admin_name = my_name.split()[0].strip().lower()
-    view_df = responses_df[
-        responses_df["Appraiser"].str.strip().str.lower() == admin_name
-    ]
-    st.info("Admin access: viewing only **your appraisees**.")
+        view_df = responses_df.copy()
+        st.info("Super Admin access: viewing **all teachers** in the school.")
+    else:
+        admin_name = my_name.split()[0].strip().lower()
+        view_df = responses_df[
+            responses_df["Appraiser"].str.strip().str.lower() == admin_name
+        ]
+        st.info("Admin access: viewing only **your appraisees**.")
 
 
     if view_df.empty:
