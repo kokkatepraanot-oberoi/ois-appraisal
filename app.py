@@ -1,38 +1,45 @@
-import streamlit as st
-from streamlit_oauth import OAuth2Component
-import jwt
-
-st.title("🔐 Google Login Test")
-
-# --- Read secrets ---
-try:
-    client_id = st.secrets["google_oauth"]["client_id"]
-    client_secret = st.secrets["google_oauth"]["client_secret"]
-    redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
-except Exception as e:
-    st.error("⚠️ Missing google_oauth config in st.secrets")
-    st.stop()
-
 from authlib.integrations.requests_client import OAuth2Session
+import streamlit as st
+import os
+import jwt  # from PyJWT
 
-def google_login():
-    client_id = st.secrets["google_oauth"]["client_id"]
-    client_secret = st.secrets["google_oauth"]["client_secret"]
-    redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
+# Load secrets
+client_id = st.secrets["google_oauth"]["client_id"]
+client_secret = st.secrets["google_oauth"]["client_secret"]
+redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
 
-    oauth = OAuth2Session(client_id, client_secret, scope="openid email profile", redirect_uri=redirect_uri)
+# Google OAuth endpoints
+auth_url = "https://accounts.google.com/o/oauth2/auth"
+token_url = "https://oauth2.googleapis.com/token"
 
-    if "code" not in st.query_params:
-        auth_url, state = oauth.create_authorization_url("https://accounts.google.com/o/oauth2/auth",
-                                                         access_type="offline", prompt="consent")
-        st.markdown(f"[Login with Google]({auth_url})")
-        return None
-    else:
+if "token" not in st.session_state:
+    # Build OAuth2 session
+    oauth = OAuth2Session(
+        client_id,
+        client_secret,
+        scope="openid email profile",
+        redirect_uri=redirect_uri
+    )
+
+    # Step 1: Redirect to Google login
+    authorization_url, state = oauth.create_authorization_url(auth_url)
+    st.markdown(f"[Login with Google]({authorization_url})")
+
+    # Step 2: Once redirected back, capture `code`
+    query_params = st.experimental_get_query_params()
+    if "code" in query_params:
+        code = query_params["code"][0]
         token = oauth.fetch_token(
-            "https://oauth2.googleapis.com/token",
-            authorization_response=st.query_params["code"],
-            grant_type="authorization_code"
+            token_url,
+            code=code
         )
-        from jwt import decode
-        user_info = decode(token["id_token"], options={"verify_signature": False})
-        return user_info
+        st.session_state["token"] = token
+        st.experimental_rerun()
+
+else:
+    token = st.session_state["token"]
+    id_token = token.get("id_token")
+
+    if id_token:
+        user_info = jwt.decode(id_token, options={"verify_signature": False})
+        st.success(f"✅ Logged in as {user_info['email']}")
