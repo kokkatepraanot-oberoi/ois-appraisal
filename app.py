@@ -601,9 +601,10 @@ if tab == "Super Admin" and i_am_sadmin:
     with col2:
         st.progress(submitted_count / total_count if total_count else 0)
 
+    st.subheader("📋 Summary of All Teachers")
     st.dataframe(summary_df, use_container_width=True)
 
-    # Optional: download whole school summary
+    # Optional: download summary
     csv = summary_df.to_csv(index=False).encode("utf-8")
     st.download_button(
         "⬇️ Download Whole School Summary (CSV)",
@@ -611,10 +612,12 @@ if tab == "Super Admin" and i_am_sadmin:
         file_name="whole_school_summary.csv",
         mime="text/csv"
     )
-elif nav_selection == "Super Admin":
-    st.subheader("📊 Whole-School Submissions (Super Admin)")
 
-    # Fetch all responses
+    # =========================
+    # Full Grid View
+    # =========================
+    st.subheader("📊 Detailed Whole-School Submissions")
+
     all_responses = responses_ws.get_all_records()
     df = pd.DataFrame(all_responses)
 
@@ -635,13 +638,12 @@ elif nav_selection == "Super Admin":
             }
             return colors.get(val, "")
 
-        styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])  # apply from A1 Expertise onwards
+        styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
 
         st.dataframe(styled_df, use_container_width=True)
 
-        # Download option
         st.download_button(
-            "⬇️ Download all submissions (CSV)",
+            "⬇️ Download All Submissions (CSV)",
             df.to_csv(index=True).encode("utf-8"),
             "all_submissions.csv",
             "text/csv"
