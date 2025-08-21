@@ -6,6 +6,6 @@ streamlit
 pandas
 gspread
 fpdf2
-streamlit-oauth==0.1.25
+streamlit-oauth==0.1.20
 PyJWT
 
