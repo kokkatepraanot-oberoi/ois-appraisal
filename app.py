@@ -411,21 +411,33 @@ if tab == "My Submission":
     df = load_responses_df()
     my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
 
-    # auto-refresh (handles stale cache after recent submit)
+    # auto-refresh once (handles cache after recent submit)
     if my.empty:
         load_responses_df.clear()
         df = load_responses_df()
         my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
 
     st.subheader("My Submission")
+
     if my.empty:
         st.info("No submission found yet.")
     else:
         my_sorted = my.sort_values("Timestamp", ascending=False)
         latest = my_sorted.head(1)
+
+        # NEW: show immediately on login without needing a click
+        st.success("✅ You have already submitted your self-assessment. Here is your latest submission:")
+
         st.dataframe(latest, use_container_width=True)
+
+        # download button with all submissions
         csv = my_sorted.to_csv(index=False).encode("utf-8")
-        st.download_button("Download my submissions (CSV)", data=csv, file_name="my_self_assessment.csv", mime="text/csv")
+        st.download_button(
+            "⬇️ Download my submissions (CSV)",
+            data=csv,
+            file_name="my_self_assessment.csv",
+            mime="text/csv"
+        )
 
     if st.button("🔄 Refresh"):
         load_responses_df.clear()
