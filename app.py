@@ -335,83 +335,82 @@ else:
 
 tab = st.sidebar.radio("Menu", nav_options, index=default_index)
 
-
-
 # =========================
-# Page: Self‑Assessment
+# Page: Self-Assessment (teachers who haven't submitted yet)
 # =========================
-if already_submitted and not i_am_admin:
-    st.info("You’ve already submitted your self‑assessment. You can view or download it in **My Submission**.")
-    st.stop()
+if tab == "Self-Assessment":
+    if already_submitted and not i_am_admin:
+        # Auto-redirect teachers with submissions to My Submission
+        st.success("✅ You’ve already submitted your self-assessment. Redirecting to your submission...")
+        tab = "My Submission"
+    else:
+        # Welcome + Appraiser info
+        me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0] if not users_df.empty else {}
+        appraiser = me.get("Appraiser","Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
+        st.sidebar.info(f"Your appraiser: **{appraiser}**")
 
-if tab == "Self‑Assessment":
-    # Welcome
-    me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0] if not users_df.empty else {}
-    appraiser = me.get("Appraiser","Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
-    st.sidebar.info(f"Your appraiser: **{appraiser}**")
-
-    # Selections are just direct widgets (outside a form) so the sidebar progress updates live.
-    selections = {}
-    reflections = {}
-    for domain, items in DOMAINS.items():
-        with st.expander(domain, expanded=False):
-            for code, label in items:
-                key = f"{code}-{label}"
-                selections[f"{code} {label}"] = st.radio(
-                    f"{code} — {label}",
-                    RATINGS,
-                    index=None,
-                    key=key,
-                ) or ""
-            if ENABLE_REFLECTIONS:
-                reflections[domain] = st.text_area(
-                    f"{domain} Reflection (optional)",
-                    key=f"refl-{domain}",
-                    placeholder="Notes / evidence / next steps (optional)",
-                )
-
-    # Submit
-    selected_count = sum(1 for v in selections.values() if v)
-    col1, col2 = st.columns([1,3])
-    with col1:
-        submit = st.button("✅ Submit")
-    with col2:
-        st.write(f"**Progress:** {selected_count}/{total_items} completed")
-
-    if submit:
-        if selected_count < total_items:
-            st.warning("Please rate **all** sub‑strands before submitting.")
-        else:
-            row = [
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                st.session_state.auth_email,
-                st.session_state.auth_name,
-                appraiser,
-            ]
-            for domain, items in DOMAINS.items():
+        # Selections (direct widgets so sidebar progress updates live)
+        selections = {}
+        reflections = {}
+        for domain, items in DOMAINS.items():
+            with st.expander(domain, expanded=False):
                 for code, label in items:
-                    row.append(selections[f"{code} {label}"])
+                    key = f"{code}-{label}"
+                    selections[f"{code} {label}"] = st.radio(
+                        f"{code} — {label}",
+                        RATINGS,
+                        index=None,
+                        key=key,
+                    ) or ""
                 if ENABLE_REFLECTIONS:
-                    row.append(reflections.get(domain, ""))
+                    reflections[domain] = st.text_area(
+                        f"{domain} Reflection (optional)",
+                        key=f"refl-{domain}",
+                        placeholder="Notes / evidence / next steps (optional)",
+                    )
 
-            try:
-                with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
-                # make new submission visible immediately
-                load_responses_df.clear()
-                st.session_state.submitted = True
-                st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
-            except Exception as e:
-                st.error("⚠️ Could not submit right now. Please try again shortly.")
-                st.caption(f"Debug info: {e}")
+        # Submit button + progress
+        selected_count = sum(1 for v in selections.values() if v)
+        col1, col2 = st.columns([1,3])
+        with col1:
+            submit = st.button("✅ Submit")
+        with col2:
+            st.write(f"**Progress:** {selected_count}/{total_items} completed")
+
+        if submit:
+            if selected_count < total_items:
+                st.warning("Please rate **all** sub-strands before submitting.")
+            else:
+                row = [
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    st.session_state.auth_email,
+                    st.session_state.auth_name,
+                    appraiser,
+                ]
+                for domain, items in DOMAINS.items():
+                    for code, label in items:
+                        row.append(selections[f"{code} {label}"])
+                    if ENABLE_REFLECTIONS:
+                        row.append(reflections.get(domain, ""))
+
+                try:
+                    with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
+                    # make new submission visible immediately
+                    load_responses_df.clear()
+                    st.session_state.submitted = True
+                    st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
+                except Exception as e:
+                    st.error("⚠️ Could not submit right now. Please try again shortly.")
+                    st.caption(f"Debug info: {e}")
 
 # =========================
-# Page: My Submission (teacher view)
+# Page: My Submission (teachers see their data here)
 # =========================
 if tab == "My Submission":
     df = load_responses_df()
     my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
 
-    # auto-refresh once (handles cache after recent submit)
+    # auto-refresh if cache stale
     if my.empty:
         load_responses_df.clear()
         df = load_responses_df()
@@ -425,9 +424,7 @@ if tab == "My Submission":
         my_sorted = my.sort_values("Timestamp", ascending=False)
         latest = my_sorted.head(1)
 
-        # NEW: show immediately on login without needing a click
         st.success("✅ You have already submitted your self-assessment. Here is your latest submission:")
-
         st.dataframe(latest, use_container_width=True)
 
         # download button with all submissions
@@ -442,6 +439,9 @@ if tab == "My Submission":
     if st.button("🔄 Refresh"):
         load_responses_df.clear()
         _rerun()
+
+
+
 
 # =========================
 # Page: Admin Panel
