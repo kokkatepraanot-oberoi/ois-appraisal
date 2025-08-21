@@ -323,16 +323,18 @@ already_submitted = user_has_submission(st.session_state.auth_email)
 i_am_admin = is_admin(st.session_state.auth_email)
 
 if i_am_admin:
-    # Admins should only see Admin panel
     nav_options = ["Admin"]
+    default_index = 0
 else:
     if already_submitted:
-        st.success("Submission on file. You can view it under **My Submission**.")
         nav_options = ["My Submission"]
+        default_index = 0   # auto-select My Submission
     else:
         nav_options = ["Self-Assessment", "My Submission"]
+        default_index = 0   # start on Self-Assessment
 
-tab = st.sidebar.radio("Menu", nav_options, index=0)
+tab = st.sidebar.radio("Menu", nav_options, index=default_index)
+
 
 
 # =========================
