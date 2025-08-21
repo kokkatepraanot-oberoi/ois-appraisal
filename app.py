@@ -398,11 +398,24 @@ if tab == "Self-Assessment":
 
         # Submit button + progress
         selected_count = sum(1 for v in selections.values() if v)
-        col1, col2 = st.columns([1,3])
+        col1, col2, col3 = st.columns([1,2,2])
+
         with col1:
-            submit = st.button("✅ Submit", disabled=(selected_count < total_items))
+            submit = st.button("✅ Submit")
+        
         with col2:
+            if st.button("💾 Save Draft Now"):
+                current_data = {f"{code} {label}": selections[f"{code} {label}"] for domain, items in DOMAINS.items() for code, label in items}
+                if ENABLE_REFLECTIONS:
+                    for domain in DOMAINS:
+                        current_data[f"{domain} Reflection"] = reflections.get(domain, "")
+                if save_draft(st.session_state.auth_email, current_data):
+                    st.success("Draft saved! You can return later to continue.")
+        
+        with col3:
             st.write(f"**Progress:** {selected_count}/{total_items} completed")
+
+
         
         if submit:
             # At this point we already know all strands are filled
