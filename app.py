@@ -149,41 +149,41 @@ def with_backoff(fn, *args, **kwargs):
 # ONE-TIME SHEETS CONNECTION (cached)
 # =========================
 @st.cache_resource
+# =========================
+# Google Sheet Connections
+# =========================
 def get_worksheets():
-    creds = Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
-    client = gspread.authorize(creds)
-    try:
-        ss = client.open_by_key(SPREADSHEET_ID)
-        resp_ws = ss.worksheet("Responses")
-        users_ws = ss.worksheet("Users")
-        return resp_ws, users_ws
-    except Exception as e:
-        st.error("⚠️ Could not access Google Sheet. Ensure the service account has **Editor** access and the Sheet ID is correct.")
-        st.caption(f"Debug info: {e}")
-        st.stop()
+    client = gspread.authorize(
+        Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
+    )
+    sh = client.open_by_key(SPREADSHEET_ID)
 
-RESP_WS, USERS_WS = get_worksheets()
+    resp_ws = sh.worksheet("Responses")
+    users_ws = sh.worksheet("Users")
+    try:
+        drafts_ws = sh.worksheet("Drafts")
+    except gspread.exceptions.WorksheetNotFound:
+        # Create if missing
+        drafts_ws = sh.add_worksheet(title="Drafts", rows="1000", cols="100")
+        drafts_ws.update([["Email"]])  # initialize header
+    return resp_ws, users_ws, drafts_ws
+
+RESP_WS, USERS_WS, DRAFTS_WS = get_worksheets()
+
 # =========================
 # DRAFT HELPERS
 # =========================
-import json
-
 def save_draft(email, form_data):
     """Save teacher's draft into Drafts sheet."""
     try:
-        draft_ws = gspread.authorize(
-            Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
-        ).open_by_key(SPREADSHEET_ID).worksheet("Drafts")
-
         df = pd.DataFrame([{"Email": email, **form_data}])
 
-        # Remove old draft for this email if exists
-        all_drafts = pd.DataFrame(draft_ws.get_all_records())
+        all_drafts = pd.DataFrame(DRAFTS_WS.get_all_records())
         all_drafts = all_drafts[all_drafts["Email"] != email]
         all_drafts = pd.concat([all_drafts, df], ignore_index=True)
 
-        draft_ws.clear()
-        draft_ws.update([all_drafts.columns.values.tolist()] + all_drafts.values.tolist())
+        DRAFTS_WS.clear()
+        DRAFTS_WS.update([all_drafts.columns.values.tolist()] + all_drafts.values.tolist())
         return True
     except Exception as e:
         st.error(f"⚠️ Could not save draft: {e}")
@@ -192,14 +192,11 @@ def save_draft(email, form_data):
 def load_draft(email):
     """Load teacher's draft if exists."""
     try:
-        draft_ws = gspread.authorize(
-            Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
-        ).open_by_key(SPREADSHEET_ID).worksheet("Drafts")
-        all_drafts = pd.DataFrame(draft_ws.get_all_records())
+        all_drafts = pd.DataFrame(DRAFTS_WS.get_all_records())
         user_draft = all_drafts[all_drafts["Email"] == email]
         if not user_draft.empty:
             return dict(user_draft.iloc[0])
-    except:
+    except Exception:
         return {}
     return {}
 
