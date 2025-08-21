@@ -439,6 +439,9 @@ else:
                     st.success("✅ Teacher login successful.")
                 else:
                     st.sidebar.error("Not authorized as Teacher.")
+            st.write("Google email:", google_email)
+            st.write("users_df preview:", users_df.head())
+
 
     except Exception as e:
         st.sidebar.warning("⚠️ Google login not configured. Add OAuth secrets to enable Teacher login.")
