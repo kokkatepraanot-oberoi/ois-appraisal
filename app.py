@@ -300,64 +300,51 @@ def user_has_submission(email: str) -> bool:
     df = load_responses_df()
     return (not df.empty) and ("Email" in df.columns) and (not df[df["Email"] == email.strip().lower()].empty)
 
+
 # =========================
 # AUTH: Login / Logout
 # =========================
-def is_admin(email: str) -> bool:
-    e = (email or "").strip().lower()
-    role_flag = False
-    if not users_df.empty and "Email" in users_df.columns and "Role" in users_df.columns:
-        row = users_df[users_df["Email"] == e]
-        if not row.empty:
-            role_flag = row.iloc[0].get("Role","").lower() in {"admin","administrator"}
-    return (e in ADMINS_FROM_SECRETS) or role_flag
-
 if "auth_email" not in st.session_state:
     st.session_state.auth_email = ""
 if "auth_name" not in st.session_state:
     st.session_state.auth_name = ""
+if "auth_role" not in st.session_state:
+    st.session_state.auth_role = ""
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
-# ---- Sidebar: Login box ----
 st.sidebar.header("Account")
 
-DEFAULT_ADMIN_PASSWORD = "OIS2025"  # 🔒 default password for all admins
-
 if st.session_state.auth_email:
-    st.sidebar.success(f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}**")
+    st.sidebar.success(
+        f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}** "
+        f"({st.session_state.auth_role})"
+    )
     if st.sidebar.button("Logout"):
         st.session_state.auth_email = ""
         st.session_state.auth_name = ""
+        st.session_state.auth_role = ""
         st.session_state.submitted = False
         _rerun()
 else:
-    email_input = st.sidebar.text_input("School email (e.g., firstname.lastname@oberoi-is.org)").strip().lower()
-    password_input = st.sidebar.text_input("Password (admins only)", type="password")
+    email_input = st.sidebar.text_input(
+        "School email (e.g., firstname.lastname@oberoi-is.org)"
+    ).strip().lower()
+    password_input = st.sidebar.text_input(
+        "Password (Admins/Super Admins only)", type="password"
+    )
 
-    login = st.sidebar.button("Login")
-    if login:
-        if email_input and not users_df.empty and "Email" in users_df.columns:
-            match = users_df[users_df["Email"] == email_input]
-            if not match.empty:
-                role = match.iloc[0].get("Role", "").lower()
+    if st.sidebar.button("Login"):
+        role, me = authenticate_user(email_input, password_input)
 
-                if role == "admin":
-                    if password_input == DEFAULT_ADMIN_PASSWORD:
-                        st.session_state.auth_email = email_input
-                        st.session_state.auth_name = match.iloc[0].get("Name","")
-                        st.success("✅ Admin login successful.")
-                        _rerun()
-                    else:
-                        st.sidebar.error("Invalid admin password.")
-                else:
-                    # teacher login (no password required)
-                    st.session_state.auth_email = email_input
-                    st.session_state.auth_name = match.iloc[0].get("Name","")
-                    st.success("✅ Teacher login successful.")
-                    _rerun()
-            else:
-                st.sidebar.error("Email not found in Users sheet.")
+        if role:
+            st.session_state.auth_email = email_input
+            st.session_state.auth_name = me.get("Name", "")
+            st.session_state.auth_role = role
+            st.sidebar.success(f"✅ {role.capitalize()} login successful.")
+            _rerun()
+        else:
+            st.sidebar.error("❌ Invalid email or password.")
 
 
 # =========================
