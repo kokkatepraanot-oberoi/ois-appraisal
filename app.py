@@ -534,9 +534,11 @@ if tab == "My Submission":
     if my.empty:
         st.info("No submission found yet.")
     else:
-        st.subheader(f"Latest submission for {teacher_choice}")
-        latest = rows.sort_values("Timestamp", ascending=False).head(1)
-        
+        # ✅ Use "my" dataframe instead of teacher_choice/rows
+        st.subheader("Latest submission")
+
+        latest = my.sort_values("Timestamp", ascending=False).head(1)
+
         # 🔹 Replace full text with acronyms
         mapping = {
             "Highly Effective": "HE",
@@ -545,7 +547,7 @@ if tab == "My Submission":
             "Does Not Meet Standards": "DNMS"
         }
         latest = latest.replace(mapping)
-        
+
         # 🔹 Apply same colors
         def highlight_ratings(val):
             colors = {
@@ -555,13 +557,12 @@ if tab == "My Submission":
                 "DNMS": "background-color: #f8a5a5;"  # red
             }
             return colors.get(val, "")
-        
+
         styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
-        
         st.dataframe(styled_latest, use_container_width=True)
 
-
-        # download button with all submissions
+        # ✅ All submissions for download (sorted)
+        my_sorted = my.sort_values("Timestamp", ascending=False)
         csv = my_sorted.to_csv(index=False).encode("utf-8")
         st.download_button(
             "⬇️ Download my submissions (CSV)",
@@ -573,6 +574,7 @@ if tab == "My Submission":
     if st.button("🔄 Refresh"):
         load_responses_df.clear()
         _rerun()
+
 
 # =========================
 # Page: Admin Panel (Admin & Super Admin)
