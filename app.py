@@ -651,6 +651,41 @@ if tab == "Admin" and i_am_admin:
         _rerun()
 
 # =========================
+# Page: Admin Panel (for Appraisers)
+# =========================
+elif tab == "Admin Panel" and i_am_admin and not i_am_superadmin:
+    st.subheader("👩‍🏫 My Appraisees' Submissions")
+
+    # Filter only submissions where this admin is the Appraiser
+    my_appraisees_df = responses_df[responses_df["Appraiser"] == st.session_state.auth_name]
+
+    if my_appraisees_df.empty:
+        st.info("ℹ️ No submissions yet from your appraisees.")
+    else:
+        # Apply same color coding as Super Admin
+        colors = {
+            "HE": "background-color: #a8e6a1;",   # green
+            "E": "background-color: #d0f0fd;",    # blue
+            "IN": "background-color: #fff3b0;",   # yellow
+            "DNMS": "background-color: #f8a5a5;"  # red
+        }
+
+        def color_map(val):
+            return colors.get(val, "")
+
+        styled_df = my_appraisees_df.style.applymap(color_map, subset=my_appraisees_df.columns[3:])
+        st.dataframe(styled_df, use_container_width=True)
+
+        # Optionally: export to Excel
+        st.download_button(
+            "📥 Download My Appraisees' Data (Excel)",
+            data=my_appraisees_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"{st.session_state.auth_name}_appraisees.csv",
+            mime="text/csv",
+        )
+
+
+# =========================
 # Page: Super Admin Panel
 # =========================
 if tab == "Super Admin" and i_am_sadmin:
