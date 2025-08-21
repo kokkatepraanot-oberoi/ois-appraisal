@@ -509,48 +509,19 @@ if tab == "Admin" and i_am_admin:
 
         summary_df = pd.DataFrame(summary_rows)
 
-       st.subheader("📋 Summary of Assigned Teachers")
+        # Compact progress display
+        col1, col2 = st.columns([1,2])
+        with col1:
+            st.markdown(
+                f"**Progress:** {submitted_count}/{total_count} submitted  "
+                f"({round((submitted_count/total_count)*100,1)}%)"
+            )
+        with col2:
+            st.progress(submitted_count / total_count if total_count else 0)
 
-        resp_df = load_responses_df()
-        summary_rows = []
-        
-        submitted_count = 0
-        total_count = len(assigned)
-        
-        for _, teacher in assigned.iterrows():
-            teacher_email = teacher["Email"].strip().lower()
-            teacher_name = teacher["Name"]
-        
-            submissions = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
-            if submissions.empty:
-                status = "❌ Not Submitted"
-                last_date = "-"
-            else:
-                status = "✅ Submitted"
-                last_date = submissions["Timestamp"].max()
-                submitted_count += 1
-        
-            summary_rows.append({
-                "Teacher": teacher_name,
-                "Email": teacher_email,
-                "Status": status,
-                "Last Submission": last_date,
-            })
-        
-        summary_df = pd.DataFrame(summary_rows)
+        # Show summary table
+        st.dataframe(summary_df, use_container_width=True)
 
-# Compact progress display
-col1, col2 = st.columns([1,2])
-with col1:
-    st.markdown(
-        f"**Progress:** {submitted_count}/{total_count} submitted  "
-        f"({round((submitted_count/total_count)*100,1)}%)"
-    )
-with col2:
-    st.progress(submitted_count / total_count if total_count else 0)
-
-# Show summary table
-st.dataframe(summary_df, use_container_width=True)
 
 
         # Optional: download summary
