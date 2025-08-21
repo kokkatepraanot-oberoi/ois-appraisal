@@ -338,20 +338,23 @@ if not st.session_state.auth_email:
     st.stop()
 
 already_submitted = user_has_submission(st.session_state.auth_email)
-i_am_admin = is_admin(st.session_state.auth_email)
+role = users_df.loc[users_df["Email"] == st.session_state.auth_email, "Role"].iloc[0].lower()
 
-if i_am_admin:
+i_am_admin = role == "admin"
+i_am_sadmin = role == "sadmin"
+
+if i_am_sadmin:
+    nav_options = ["Super Admin"]
+elif i_am_admin:
     nav_options = ["Admin"]
-    default_index = 0
 else:
     if already_submitted:
         nav_options = ["My Submission"]
-        default_index = 0   # auto-select My Submission
     else:
         nav_options = ["Self-Assessment", "My Submission"]
-        default_index = 0   # start on Self-Assessment
 
-tab = st.sidebar.radio("Menu", nav_options, index=default_index)
+tab = st.sidebar.radio("Menu", nav_options, index=0)
+
 
 # =========================
 # Page: Self-Assessment (teachers who haven't submitted yet)
@@ -552,3 +555,59 @@ if tab == "Admin" and i_am_admin:
     if st.button("🔄 Refresh Admin Data"):
         load_responses_df.clear()
         _rerun()
+
+# =========================
+# Page: Super Admin Panel
+# =========================
+if tab == "Super Admin" and i_am_sadmin:
+    st.header("🏫 Super Admin Panel — Whole School View")
+
+    assigned = users_df[users_df["Role"] == "user"]  # all teachers
+    resp_df = load_responses_df()
+    summary_rows = []
+
+    submitted_count = 0
+    total_count = len(assigned)
+
+    for _, teacher in assigned.iterrows():
+        teacher_email = teacher["Email"].strip().lower()
+        teacher_name = teacher["Name"]
+
+        submissions = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
+        if submissions.empty:
+            status = "❌ Not Submitted"
+            last_date = "-"
+        else:
+            status = "✅ Submitted"
+            last_date = submissions["Timestamp"].max()
+            submitted_count += 1
+
+        summary_rows.append({
+            "Teacher": teacher_name,
+            "Email": teacher_email,
+            "Status": status,
+            "Last Submission": last_date,
+        })
+
+    summary_df = pd.DataFrame(summary_rows)
+
+    # Compact progress display
+    col1, col2 = st.columns([1,2])
+    with col1:
+        st.markdown(
+            f"**Progress:** {submitted_count}/{total_count} submitted  "
+            f"({round((submitted_count/total_count)*100,1)}%)"
+        )
+    with col2:
+        st.progress(submitted_count / total_count if total_count else 0)
+
+    st.dataframe(summary_df, use_container_width=True)
+
+    # Optional: download whole school summary
+    csv = summary_df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "⬇️ Download Whole School Summary (CSV)",
+        data=csv,
+        file_name="whole_school_summary.csv",
+        mime="text/csv"
+    )
