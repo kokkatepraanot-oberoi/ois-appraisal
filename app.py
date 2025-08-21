@@ -569,12 +569,11 @@ elif tab == "Admin Panel" and i_am_admin:
         view_df = responses_df.copy()
         st.info("Super Admin access: viewing **all teachers** in the school.")
     else:
-        admin_name = my_name.split()[0].strip().lower()
+        admin_first = my_name.split()[0].strip().lower()
         view_df = responses_df[
-            responses_df["Appraiser"].str.strip().str.lower() == admin_name
+            responses_df["Appraiser"].str.strip().str.lower() == admin_first
         ]
         st.info("Admin access: viewing only **your appraisees**.")
-
 
     if view_df.empty:
         st.info("ℹ️ No submissions yet.")
@@ -606,7 +605,7 @@ elif tab == "Admin Panel" and i_am_admin:
         # Progress
         st.divider()
         st.subheader("📋 Progress Summary")
-        total = len(users_df[users_df["Role"] == "user"]) if my_role == "sadmin" else len(view_df)
+        total = len(users_df[users_df["Role"] == "user"]) if my_role == "sadmin" else len(users_df[users_df["Appraiser"].str.strip().str.lower() == admin_first])
         submitted = len(view_df)
         col1, col2 = st.columns([1,2])
         with col1:
