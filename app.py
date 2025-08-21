@@ -256,21 +256,6 @@ def user_has_submission(email: str) -> bool:
 # =========================
 # AUTH: Login / Logout
 # =========================
-def is_admin(email: str) -> bool:
-    e = (email or "").strip().lower()
-    role_flag = False
-    if not users_df.empty and "Email" in users_df.columns and "Role" in users_df.columns:
-        row = users_df[users_df["Email"] == e]
-        if not row.empty:
-            role_flag = row.iloc[0].get("Role","").lower() in {"admin","administrator"}
-    return (e in ADMINS_FROM_SECRETS) or role_flag
-
-if "auth_email" not in st.session_state:
-    st.session_state.auth_email = ""
-if "auth_name" not in st.session_state:
-    st.session_state.auth_name = ""
-if "submitted" not in st.session_state:
-    st.session_state.submitted = False
 
 # ---- Sidebar: Login box ----
 st.sidebar.header("Account")
@@ -427,36 +412,3 @@ if tab == "My Submission":
     if st.button("🔄 Refresh"):
         load_responses_df.clear()
         _rerun()
-
-# =========================
-# Page: Admin (only for admins)
-# =========================
-if tab == "Admin":
-    if not is_admin(st.session_state.auth_email):
-        st.error("Admin access only.")
-    else:
-        st.subheader("All Responses")
-        df = load_responses_df()
-        if df.empty:
-            st.info("No responses yet.")
-        else:
-            c1, c2 = st.columns(2)
-            with c1:
-                q_name = st.text_input("Filter by Name contains", "")
-            with c2:
-                q_email = st.text_input("Filter by Email contains", "")
-
-            view = df.copy()
-            if q_name:
-                view = view[view["Name"].str.contains(q_name, case=False, na=False)]
-            if q_email:
-                view = view[view["Email"].str.contains(q_email, case=False, na=False)]
-
-            st.dataframe(view, use_container_width=True, height=480)
-
-            csv_all = view.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Download filtered (CSV)", data=csv_all, file_name="responses_filtered.csv", mime="text/csv")
-
-        if st.button("🔄 Refresh"):
-            load_responses_df.clear()
-            _rerun()
