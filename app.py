@@ -332,10 +332,13 @@ def authenticate_user(email, password):
 
     return None, None
 
-
 # =========================
 # AUTH: Login / Logout
 # =========================
+
+DEFAULT_ADMIN_PASSWORD = "OIS2025"
+DEFAULT_SADMIN_PASSWORD = "SOIS2025"
+
 if "auth_email" not in st.session_state:
     st.session_state.auth_email = ""
 if "auth_name" not in st.session_state:
@@ -347,10 +350,10 @@ if "submitted" not in st.session_state:
 
 st.sidebar.header("Account")
 
+# --- Logout ---
 if st.session_state.auth_email:
     st.sidebar.success(
-        f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}** "
-        f"({st.session_state.auth_role})"
+        f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}** ({st.session_state.auth_role})"
     )
     if st.sidebar.button("Logout"):
         st.session_state.auth_email = ""
@@ -359,24 +362,78 @@ if st.session_state.auth_email:
         st.session_state.submitted = False
         _rerun()
 else:
-    email_input = st.sidebar.text_input(
-        "School email (e.g., firstname.lastname@oberoi-is.org)"
-    ).strip().lower()
-    password_input = st.sidebar.text_input(
-        "Password (Admins/Super Admins only)", type="password"
-    )
+    # --- Admin/Superadmin login (email + password) ---
+    st.sidebar.subheader("🔑 Admin / Superadmin Login")
+    email_input = st.sidebar.text_input("School email")
+    password_input = st.sidebar.text_input("Password", type="password")
 
-    if st.sidebar.button("Login"):
-        role, me = authenticate_user(email_input, password_input)
+    if st.sidebar.button("Login as Admin/Superadmin"):
+        if email_input and not users_df.empty:
+            match = users_df[users_df["Email"].str.lower() == email_input.strip().lower()]
+            if not match.empty:
+                role = match.iloc[0].get("Role", "").lower()
 
-        if role:
-            st.session_state.auth_email = email_input
-            st.session_state.auth_name = me.get("Name", "")
-            st.session_state.auth_role = role
-            st.sidebar.success(f"✅ {role.capitalize()} login successful.")
-            _rerun()
-        else:
-            st.sidebar.error("❌ Invalid email or password.")
+                if role == "admin" and password_input == DEFAULT_ADMIN_PASSWORD:
+                    st.session_state.auth_email = email_input
+                    st.session_state.auth_name = match.iloc[0].get("Name", "")
+                    st.session_state.auth_role = "admin"
+                    st.success("✅ Admin login successful.")
+                    _rerun()
+                elif role == "sadmin" and password_input == DEFAULT_SADMIN_PASSWORD:
+                    st.session_state.auth_email = email_input
+                    st.session_state.auth_name = match.iloc[0].get("Name", "")
+                    st.session_state.auth_role = "sadmin"
+                    st.success("✅ Super Admin login successful.")
+                    _rerun()
+                else:
+                    st.sidebar.error("Invalid credentials for Admin/Superadmin.")
+            else:
+                st.sidebar.error("Email not found in Users sheet.")
+
+    # --- Teacher login via Google ---
+    st.sidebar.subheader("👩‍🏫 Teacher Login (Google)")
+    try:
+        from streamlit_oauth import OAuth2Component
+
+        # Google OAuth client details from st.secrets
+        client_id = st.secrets["google_oauth"]["client_id"]
+        client_secret = st.secrets["google_oauth"]["client_secret"]
+        redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
+
+        oauth2 = OAuth2Component(
+            client_id=client_id,
+            client_secret=client_secret,
+            auth_url="https://accounts.google.com/o/oauth2/auth",
+            token_url="https://oauth2.googleapis.com/token",
+            refresh_token_url="https://oauth2.googleapis.com/token",
+        )
+
+        token = oauth2.authorize_button(
+            name="Login with Google",
+            icon="🔒",
+            redirect_uri=redirect_uri,
+            scope=["openid", "email", "profile"],
+            key="google"
+        )
+
+        if token:
+            import jwt
+            id_token = token["id_token"]
+            user_info = jwt.decode(id_token, options={"verify_signature": False})
+            google_email = user_info.get("email", "").lower()
+
+            match = users_df[users_df["Email"].str.lower() == google_email]
+            if not match.empty and match.iloc[0].get("Role", "").lower() == "user":
+                st.session_state.auth_email = google_email
+                st.session_state.auth_name = match.iloc[0].get("Name", "")
+                st.session_state.auth_role = "user"
+                st.success("✅ Teacher login successful.")
+                _rerun()
+            else:
+                st.sidebar.error("Not authorized as Teacher.")
+    except Exception as e:
+        st.sidebar.warning("⚠️ Google login not configured. Add OAuth secrets to enable Teacher login.")
+        st.sidebar.caption(f"Debug: {e}")
 
 
 # =========================
