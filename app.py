@@ -411,22 +411,6 @@ else:
             # --- Sidebar link ---
             st.sidebar.markdown(f"[Login with Google]({authorization_url})")
 
-            # 👇 NEW: Big centered button on main page
-            st.markdown(
-                f"""
-                <div style="text-align: center; margin-top: 40px;">
-                    <a href="{authorization_url}" target="_self">
-                        <button style="padding:14px 28px; font-size:18px;
-                                       background-color:#4285F4; color:white;
-                                       border:none; border-radius:6px;
-                                       cursor:pointer;">
-                            🔑 Login with Google
-                        </button>
-                    </a>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
 
             query_params = st.query_params  # modern API
             if "code" in query_params:
