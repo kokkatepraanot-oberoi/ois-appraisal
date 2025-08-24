@@ -1,4 +1,3 @@
-# login.py
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
@@ -11,25 +10,23 @@ import pandas as pd
 SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# Google OAuth client info (from Google Cloud Console)
 CLIENT_ID = st.secrets["oauth"]["client_id"]
 CLIENT_SECRET = st.secrets["oauth"]["client_secret"]
-REDIRECT_URI = st.secrets["oauth"]["redirect_uri"]  # e.g. https://your-app.streamlit.app
+REDIRECT_URI = st.secrets["oauth"]["redirect_uri"]
 
 # =========================
-# Connect to Users Sheet
+# Google Sheets connection
 # =========================
 def get_users_df():
     creds = Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
     client = gspread.authorize(creds)
     ws = client.open_by_key(SPREADSHEET_ID).worksheet("Users")
-    df = pd.DataFrame(ws.get_all_records())
-    return df
+    return pd.DataFrame(ws.get_all_records())
 
 users_df = get_users_df()
 
 # =========================
-# Google Sign-In
+# UI
 # =========================
 st.set_page_config(page_title="OIS Login", layout="centered")
 st.title("🔐 OIS Teacher Appraisal Login")
@@ -54,26 +51,26 @@ if "token" not in st.session_state:
         st.session_state.token = result
         st.rerun()
 else:
-    # Fetch user info
     token = st.session_state.token
     user_info = oauth2.get_user_info(token)
     email = user_info.get("email", "").lower()
 
-    st.success(f"✅ Logged in as {email}")
-
-    # Check role in Users sheet
+    # Verify in Users sheet
     match = users_df[users_df["Email"].str.lower() == email]
     if match.empty:
         st.error("❌ Your email is not registered in the OIS Users sheet.")
-    else:
-        role = match.iloc[0]["Role"].lower()
-        name = match.iloc[0]["Name"]
+        st.stop()
 
-        st.info(f"Welcome **{name}** ({role})")
+    user_row = match.iloc[0]
+    role = user_row.get("Role", "user").lower()
+    name = user_row.get("Name", email)
 
-        if role == "user":
-            st.page_link("app.py", label="Go to Self-Assessment", icon="📝")
-        elif role == "admin":
-            st.page_link("app.py", label="Go to Admin Panel", icon="👩‍💼")
-        elif role == "sadmin":
-            st.page_link("app.py", label="Go to Super Admin Dashboard", icon="🏫")
+    # Save in session_state (so main.py can pick it up)
+    st.session_state.auth_email = email
+    st.session_state.auth_name = name
+    st.session_state.auth_role = role
+
+    st.success(f"✅ Welcome {name} ({role}) — redirecting…")
+
+    # 🔄 Jump to main.py automatically
+    st.switch_page("main.py")
