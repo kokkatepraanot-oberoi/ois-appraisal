@@ -15,7 +15,6 @@ if "auth_role" in st.session_state:
 st.set_page_config(
     page_title="OIS Teacher Appraisal Login",
     layout="centered",
-    initial_sidebar_state="collapsed",
 )
 
 st.title("🔐 OIS Teacher Appraisal Login")
