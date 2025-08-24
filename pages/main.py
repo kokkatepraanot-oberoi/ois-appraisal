@@ -7,7 +7,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 
-st.set_page_config(page_title="OIS Teacher Self-Assessment", layout="wide")
+# =========================
+# UI CONFIG (must be first)
+# =========================
+st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
 
 # Try to import HttpError; fall back gracefully if googleapiclient isn't present
 try:
@@ -25,10 +28,6 @@ def _rerun():
     except AttributeError:
         st.experimental_rerun()  # Older versions
 
-# =========================
-# UI CONFIG (must be first)
-# =========================
-st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
 
 # =========================
 # CONFIG
