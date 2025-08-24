@@ -338,49 +338,23 @@ def authenticate_user(email, password):
 
 
 # =========================
-# AUTH: Login / Logout
+# AUTH: Account + Logout (from Google login in app.py)
 # =========================
-if "auth_email" not in st.session_state:
-    st.session_state.auth_email = ""
-if "auth_name" not in st.session_state:
-    st.session_state.auth_name = ""
-if "auth_role" not in st.session_state:
-    st.session_state.auth_role = ""
-if "submitted" not in st.session_state:
-    st.session_state.submitted = False
+if "auth_email" not in st.session_state or not st.session_state.auth_email:
+    st.info("Please log in first.")
+    st.stop()
 
-st.sidebar.header("Account")
-
-if st.session_state.auth_email:
-    st.sidebar.success(
-        f"Logged in as **{st.session_state.auth_name or st.session_state.auth_email}** "
+with st.sidebar:
+    st.header("Account")
+    st.success(
+        f"👤 {st.session_state.auth_name or st.session_state.auth_email} "
         f"({st.session_state.auth_role})"
     )
-    if st.sidebar.button("Logout"):
-        st.session_state.auth_email = ""
-        st.session_state.auth_name = ""
-        st.session_state.auth_role = ""
-        st.session_state.submitted = False
-        _rerun()
-else:
-    email_input = st.sidebar.text_input(
-        "School email (e.g., firstname.lastname@oberoi-is.org)"
-    ).strip().lower()
-    password_input = st.sidebar.text_input(
-        "Password (Admins/Super Admins only)", type="password"
-    )
 
-    if st.sidebar.button("Login"):
-        role, me = authenticate_user(email_input, password_input)
-
-        if role:
-            st.session_state.auth_email = email_input
-            st.session_state.auth_name = me.get("Name", "")
-            st.session_state.auth_role = role
-            st.sidebar.success(f"✅ {role.capitalize()} login successful.")
-            _rerun()
-        else:
-            st.sidebar.error("❌ Invalid email or password.")
+    # Logout button
+    if st.button("🚪 Logout"):
+        st.session_state.clear()
+        st.switch_page("app.py")   # 👈 send them back to login page
 
 
 # =========================
