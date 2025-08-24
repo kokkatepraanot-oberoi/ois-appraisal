@@ -464,18 +464,18 @@ if tab == "Self-Assessment":
                     save_draft(st.session_state.auth_email, draft_payload)
                     st.success("✅ Draft saved!")
            
-            # 🔗 Extra link under Save Draft
-            st.markdown(
-                """
-                <br>
-                <a href="https://drive.google.com/file/d/1GrDAkk8zev6pr4AmmKA6YyTzeUdZ8dZC/view?usp=sharing"
-                   target="_blank"
-                   style="text-decoration:none; font-weight:bold; color:#1a73e8;">
-                   📄 View Guidelines
-                </a>
-                """,
-                unsafe_allow_html=True
-            )
+                # 🔗 Extra link under Save Draft
+                st.markdown(
+                    """
+                    <br>
+                    <a href="https://drive.google.com/file/d/1GrDAkk8zev6pr4AmmKA6YyTzeUdZ8dZC/view?usp=sharing"
+                       target="_blank"
+                       style="text-decoration:none; font-weight:bold; color:#1a73e8;">
+                       📄 View Guidelines
+                    </a>
+                    """,
+                    unsafe_allow_html=True
+                )
 
         # Handle Submit
         if submit:
