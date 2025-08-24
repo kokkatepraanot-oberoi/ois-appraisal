@@ -54,8 +54,10 @@ if "token" in st.session_state and st.session_state["token"]:
         user_info = resp.json()
         email = user_info["email"].lower()
 
-        # Lookup in Users sheet
+        # 👇 Always reload Users sheet fresh here
+        users_df = get_users_df()
         match = users_df[users_df["Email"].str.lower() == email]
+
         if match.empty:
             st.error("❌ Your email is not registered in the OIS Users sheet.")
             st.stop()
@@ -70,12 +72,8 @@ if "token" in st.session_state and st.session_state["token"]:
         st.session_state.auth_role = role
 
         st.success(f"✅ Welcome {name} ({role}) — redirecting…")
-        st.switch_page("pages/main.py")   # 👈 Explicit path inside pages/
+        st.switch_page("main.py")
 
-    else:
-        st.warning("⚠️ Session expired, please log in again.")
-        del st.session_state["token"]
-        st.rerun()
 
 # =========================
 # 2. If callback from Google has ?code= → exchange for token
