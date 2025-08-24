@@ -355,9 +355,13 @@ with st.sidebar:
             for key in ["token", "auth_email", "auth_name", "auth_role", "submitted"]:
                 if key in st.session_state:
                     del st.session_state[key]
+
             st.cache_data.clear()
             st.cache_resource.clear()
-            st.rerun()
+
+            # 🚀 Redirect back to login page (app.py)
+            st.switch_page("../app.py")
+
     
 
     else:
