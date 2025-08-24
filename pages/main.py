@@ -351,10 +351,11 @@ with st.sidebar:
         f"({st.session_state.auth_role})"
     )
 
-    # Logout button
+    # Hard Logout button
     if st.button("🚪 Logout"):
+        # clear *everything*, including Google token
         st.session_state.clear()
-        st.switch_page("app.py")   # 👈 send them back to login page
+        st.rerun()   # rerun sends user back to app.py (login)
 
 
 # =========================
