@@ -359,8 +359,9 @@ with st.sidebar:
             st.cache_data.clear()
             st.cache_resource.clear()
 
-            # 🚀 Redirect back to login page (app.py)
-            st.switch_page("app")
+            # Force back to root app.py
+            st.session_state["force_login"] = True
+            st.rerun()
 
     else:
         st.info("Please log in first.")
