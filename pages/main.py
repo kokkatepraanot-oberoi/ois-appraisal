@@ -351,11 +351,15 @@ with st.sidebar:
         f"({st.session_state.auth_role})"
     )
 
-    # Hard Logout button
-    if st.button("🚪 Logout"):
-        # clear *everything*, including Google token
-        st.session_state.clear()
-        st.rerun()   # rerun sends user back to app.py (login)
+   if st.sidebar.button("🚪 Logout"):
+    # Clear all login-related session keys
+    for key in ["token", "auth_email", "auth_name", "auth_role", "submitted"]:
+        if key in st.session_state:
+            del st.session_state[key]
+    st.rerun()
+
+
+
 
 
 # =========================
