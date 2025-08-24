@@ -471,7 +471,7 @@ if tab == "Self-Assessment":
                     <a href="https://drive.google.com/file/d/1GrDAkk8zev6pr4AmmKA6YyTzeUdZ8dZC/view?usp=sharing"
                        target="_blank"
                        style="text-decoration:none; font-weight:bold; color:#1a73e8;">
-                       📄 View Guidelines
+                       📄 View Guidelines for Teacher Growth Rubric (Self-Assessment)
                     </a>
                     """,
                     unsafe_allow_html=True
