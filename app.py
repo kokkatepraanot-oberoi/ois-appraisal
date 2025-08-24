@@ -1,3 +1,5 @@
+st.set_page_config(page_title="OIS Teacher Appraisal Login", layout="centered", initial_sidebar_state="collapsed")
+
 import streamlit as st
 from authlib.integrations.requests_client import OAuth2Session
 import requests
@@ -5,7 +7,7 @@ import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="OIS Teacher Appraisal Login", layout="centered", initial_sidebar_state="collapsed")
+
 
 # =========================
 # CONFIG
