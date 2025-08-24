@@ -5,9 +5,7 @@ import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
 
-# Always clear role at start (for testing)
-if "auth_role" in st.session_state:
-    del st.session_state["auth_role"]
+
 
 # =========================
 # PAGE CONFIG
