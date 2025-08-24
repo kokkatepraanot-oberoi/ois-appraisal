@@ -110,7 +110,10 @@ elif "code" in st.query_params:  # 👈 new API (no deprecation)
 # 3. Otherwise → show login button
 # =========================
 else:
-    auth_url, state = oauth.create_authorization_url(AUTHORIZE_URL)
+    auth_url, state = oauth.create_authorization_url(
+        AUTHORIZE_URL,
+        prompt="select_account"
+    )
     
     st.markdown(
     f"""
