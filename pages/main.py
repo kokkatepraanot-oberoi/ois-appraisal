@@ -340,25 +340,20 @@ def authenticate_user(email, password):
 # =========================
 # AUTH: Account + Logout (from Google login in app.py)
 # =========================
-if "auth_email" not in st.session_state or not st.session_state.auth_email:
-    st.info("Please log in first.")
-    st.stop()
-
 with st.sidebar:
     st.header("Account")
-    st.success(
-        f"👤 {st.session_state.auth_name or st.session_state.auth_email} "
-        f"({st.session_state.auth_role})"
-    )
 
-   if st.sidebar.button("🚪 Logout"):
-    # Clear all login-related session keys
-    for key in ["token", "auth_email", "auth_name", "auth_role", "submitted"]:
-        if key in st.session_state:
-            del st.session_state[key]
-    st.rerun()
+    if st.session_state.get("auth_email"):
+        st.write(f"👤 {st.session_state.auth_name} ({st.session_state.auth_role})")
 
-
+        if st.button("🚪 Logout"):
+            # Clear all login-related session keys
+            for key in ["token", "auth_email", "auth_name", "auth_role", "submitted"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+    else:
+        st.info("Please log in first.")
 
 
 
