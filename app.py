@@ -9,6 +9,15 @@ from google.oauth2.service_account import Credentials
 if st.session_state.get("force_login"):
     del st.session_state["force_login"]
     st.session_state.clear()
+    
+# Hide sidebar completely on login page
+hide_sidebar_style = """
+    <style>
+        [data-testid="stSidebar"] {display: none;}
+        [data-testid="stSidebarNav"] {display: none;}
+    </style>
+"""
+st.markdown(hide_sidebar_style, unsafe_allow_html=True)
 
 
 st.title("🔐 OIS Teacher Appraisal Login")
