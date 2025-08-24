@@ -360,13 +360,10 @@ with st.sidebar:
             st.cache_resource.clear()
 
             # 🚀 Redirect back to login page (app.py)
-            st.switch_page("app.py")
-
-    
+            st.switch_page("app")
 
     else:
         st.info("Please log in first.")
-
 
 
 # =========================
