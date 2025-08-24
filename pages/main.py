@@ -344,7 +344,7 @@ if "auth_email" not in st.session_state or not st.session_state.auth_email:
     st.info("Please log in first.")
     st.stop()
     
-if st.sidebar.button("🚪 Logout"):
+if st.sidebar.button("🚪 **LOGOUT**", type="primary", use_container_width=True):
     # Clear all login-related session keys
     for key in ["token", "auth_email", "auth_name", "auth_role", "submitted"]:
         if key in st.session_state:
