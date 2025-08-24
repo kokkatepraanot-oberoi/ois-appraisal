@@ -2,11 +2,12 @@
 # main.py
 import time
 from datetime import datetime
-
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
+
+st.set_page_config(page_title="OIS Teacher Self-Assessment", layout="wide")
 
 # Try to import HttpError; fall back gracefully if googleapiclient isn't present
 try:
