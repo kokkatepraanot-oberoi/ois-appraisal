@@ -69,7 +69,9 @@ if "token" in st.session_state and st.session_state["token"]:
         st.session_state.auth_role = role
 
         st.success(f"✅ Welcome {name} ({role}) — redirecting…")
-        st.switch_page("main.py")
+        # st.switch_page("main.py")
+        st.switch_page("OIS Teacher Self-Assessment")
+
     else:
         st.warning("⚠️ Session expired, please log in again.")
         del st.session_state["token"]
