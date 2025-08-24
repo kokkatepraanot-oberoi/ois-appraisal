@@ -109,18 +109,18 @@ elif "code" in st.query_params:  # 👈 new API (no deprecation)
 # =========================
 # 3. Otherwise → show login button
 # =========================
+# =========================
+# 3. Otherwise → show login button
+# =========================
 else:
+    # Force Google to only allow @oberoi-is.org accounts
     auth_url, state = oauth.create_authorization_url(
         AUTHORIZE_URL,
-        prompt="select_account"
+        prompt="select_account",
+        hd="oberoi-is.org"   # 👈 restrict domain
     )
-    
-    st.markdown(
-    f"""
-    <a href="{auth_url}" target="_self">
-        <button style="padding:0.6em 1.2em; font-size:1em;">👉 Login with Google</button>
-    </a>
-    """,
-    unsafe_allow_html=True
-)
+
+    # Show as proper Streamlit button (not iframe)
+    st.link_button("👉 Login with Google", auth_url)
+
 
