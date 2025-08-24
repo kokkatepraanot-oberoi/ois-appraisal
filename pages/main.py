@@ -355,7 +355,11 @@ with st.sidebar:
             for key in ["token", "auth_email", "auth_name", "auth_role", "submitted"]:
                 if key in st.session_state:
                     del st.session_state[key]
+            st.cache_data.clear()
+            st.cache_resource.clear()
             st.rerun()
+    
+
     else:
         st.info("Please log in first.")
 
