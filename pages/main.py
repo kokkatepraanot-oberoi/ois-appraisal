@@ -452,20 +452,18 @@ if tab == "Self-Assessment":
                 disabled=(selected_count < total_items) or st.session_state.get("submitted", False)
             )
 
-            save_draft_btn = st.button("💾 Save Draft Now")
-        with col2:
-            st.write(f"**Progress:** {selected_count}/{total_items} completed")
+            # Sidebar: Save Draft
+            with st.sidebar:
+                if st.button("💾 Save Draft", use_container_width=True):
+                    draft_payload = {}
+                    for domain, items in DOMAINS.items():
+                        for code, label in items:
+                            draft_payload[f"{code} {label}"] = selections[f"{code} {label}"]
+                        if ENABLE_REFLECTIONS:
+                            draft_payload[f"Reflection-{domain}"] = reflections.get(domain, "")
+                    save_draft(st.session_state.auth_email, draft_payload)
+                    st.success("✅ Draft saved!")
 
-        # Handle Save Draft
-        if save_draft_btn:
-            draft_payload = {}
-            for domain, items in DOMAINS.items():
-                for code, label in items:
-                    draft_payload[f"{code} {label}"] = selections[f"{code} {label}"]
-                if ENABLE_REFLECTIONS:
-                    draft_payload[f"Reflection-{domain}"] = reflections.get(domain, "")
-            save_draft(st.session_state.auth_email, draft_payload)
-            st.success("✅ Draft saved successfully!")
 
         # Handle Submit
         if submit:
