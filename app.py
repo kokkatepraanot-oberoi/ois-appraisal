@@ -6,15 +6,6 @@ import pandas as pd
 from google.oauth2.service_account import Credentials
 
 
-
-# =========================
-# PAGE CONFIG
-# =========================
-st.set_page_config(
-    page_title="OIS Teacher Appraisal Login",
-    layout="centered",
-)
-
 st.title("🔐 OIS Teacher Appraisal Login")
 
 # =========================
