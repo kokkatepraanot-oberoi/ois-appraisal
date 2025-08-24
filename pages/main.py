@@ -361,7 +361,7 @@ with st.sidebar:
 
             # Force back to root app.py
             st.session_state["force_login"] = True
-            st.rerun()
+            # st.rerun()
 
     else:
         st.info("Please log in first.")
