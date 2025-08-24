@@ -5,6 +5,11 @@ import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
 
+# Auto-redirect here if forced from logout
+if st.session_state.get("force_login"):
+    del st.session_state["force_login"]
+    st.session_state.clear()
+
 
 st.title("🔐 OIS Teacher Appraisal Login")
 
