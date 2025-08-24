@@ -5,7 +5,17 @@ import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="OIS Teacher Appraisal Login", layout="centered", initial_sidebar_state="collapsed")
+# =========================
+# PAGE CONFIG
+# =========================
+st.set_page_config(
+    page_title="OIS Teacher Appraisal Login",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
+
+st.title("🔐 OIS Teacher Appraisal Login")
+
 # =========================
 # CONFIG
 # =========================
@@ -23,6 +33,7 @@ USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo"
 # =========================
 # Google Sheets: load Users
 # =========================
+@st.cache_data
 def get_users_df():
     creds = Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
     client = gspread.authorize(creds)
@@ -40,9 +51,6 @@ oauth = OAuth2Session(
     scope="openid email profile",
     redirect_uri=REDIRECT_URI,
 )
-
-st.set_page_config(page_title="OIS Login", layout="centered")
-st.title("🔐 OIS Teacher Appraisal Login")
 
 # =========================
 # 1. If token already exists in session → reuse it
@@ -70,10 +78,7 @@ if "token" in st.session_state and st.session_state["token"]:
         st.session_state.auth_role = role
 
         st.success(f"✅ Welcome {name} ({role}) — redirecting…")
-        st.switch_page("OIS Teacher Self-Assessment")
-
-
-
+        st.switch_page("pages/main.py")   # 👈 Explicit path inside pages/
 
     else:
         st.warning("⚠️ Session expired, please log in again.")
@@ -83,8 +88,10 @@ if "token" in st.session_state and st.session_state["token"]:
 # =========================
 # 2. If callback from Google has ?code= → exchange for token
 # =========================
-elif "code" in st.experimental_get_query_params():
-    code = st.experimental_get_query_params()["code"][0]
+elif "code" in st.query_params:  # 👈 new API (no deprecation)
+    code = st.query_params["code"]
+    if isinstance(code, list):  # query_params can give list
+        code = code[0]
     try:
         token = oauth.fetch_token(
             TOKEN_URL,
