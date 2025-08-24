@@ -54,7 +54,7 @@ if "token" in st.session_state and st.session_state["token"]:
         user_info = resp.json()
         email = user_info["email"].lower()
 
-        # 👇 Always reload Users sheet fresh here
+        # 🔄 Always reload Users sheet fresh
         users_df = get_users_df()
         match = users_df[users_df["Email"].str.lower() == email]
 
@@ -66,14 +66,13 @@ if "token" in st.session_state and st.session_state["token"]:
         role = row.get("Role", "user").lower()
         name = row.get("Name", email)
 
-        # Save session vars for main.py
+        # Save session vars fresh every login
         st.session_state.auth_email = email
         st.session_state.auth_name = name
         st.session_state.auth_role = role
 
         st.success(f"✅ Welcome {name} ({role}) — redirecting…")
         st.switch_page("pages/main.py")
-
 
 # =========================
 # 2. If callback from Google has ?code= → exchange for token
