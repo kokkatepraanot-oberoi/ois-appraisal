@@ -69,7 +69,8 @@ if "token" in st.session_state and st.session_state["token"]:
         st.session_state.auth_role = role
 
         st.success(f"✅ Welcome {name} ({role}) — redirecting…")
-        st.switch_page("main")
+        st.switch_page("main.py")
+
 
 
     else:
