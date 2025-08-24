@@ -340,6 +340,10 @@ def authenticate_user(email, password):
 # =========================
 # AUTH: Account + Logout (from Google login in app.py)
 # =========================
+if "auth_email" not in st.session_state or not st.session_state.auth_email:
+    st.info("Please log in first.")
+    st.stop()
+    
 with st.sidebar:
     st.header("Account")
 
