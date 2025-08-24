@@ -97,4 +97,13 @@ elif "code" in st.query_params:  # 👈 new API (no deprecation)
 # =========================
 else:
     auth_url, state = oauth.create_authorization_url(AUTHORIZE_URL)
-    st.markdown(f"[👉 Login with Google]({auth_url})")
+    
+    st.markdown(
+    f"""
+    <a href="{auth_url}" target="_self">
+        <button style="padding:0.6em 1.2em; font-size:1em;">👉 Login with Google</button>
+    </a>
+    """,
+    unsafe_allow_html=True
+)
+
