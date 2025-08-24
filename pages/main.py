@@ -344,27 +344,18 @@ if "auth_email" not in st.session_state or not st.session_state.auth_email:
     st.info("Please log in first.")
     st.stop()
     
-with st.sidebar:
-    st.header("Account")
+if st.sidebar.button("🚪 Logout"):
+    # Clear all login-related session keys
+    for key in ["token", "auth_email", "auth_name", "auth_role", "submitted"]:
+        if key in st.session_state:
+            del st.session_state[key]
 
-    if st.session_state.get("auth_email"):
-        st.write(f"👤 {st.session_state.auth_name} ({st.session_state.auth_role})")
+    st.cache_data.clear()
+    st.cache_resource.clear()
 
-        if st.button("🚪 Logout"):
-            # Clear all login-related session keys
-            for key in ["token", "auth_email", "auth_name", "auth_role", "submitted"]:
-                if key in st.session_state:
-                    del st.session_state[key]
+    # Force redirect to app.py (login)
+    st.switch_page("app.py")
 
-            st.cache_data.clear()
-            st.cache_resource.clear()
-
-            # Force back to root app.py
-            st.session_state["force_login"] = True
-            st.rerun()
-
-    else:
-        st.info("Please log in first.")
 
 
 # =========================
