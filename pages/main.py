@@ -405,7 +405,7 @@ tab = st.sidebar.radio("Menu", nav_options, index=0)
 # =========================
 # Page: Self-Assessment (teachers who haven't submitted yet)
 # =========================
-from descriptors import DESCRIPTORS  # 👈 make sure descriptors.py is in same folder
+from .descriptors import DESCRIPTORS  # 👈 make sure descriptors.py is in same folder
 
 if tab == "Self-Assessment":
     if already_submitted and not i_am_admin:
