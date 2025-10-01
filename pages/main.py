@@ -583,8 +583,13 @@ if tab == "My Submission":
                 # Add "Last Edited On" column if missing
                 header = with_backoff(RESP_WS.row_values, 1)
                 if "Last Edited On" not in header:
+                    # Ensure the sheet has enough columns
+                    if RESP_WS.col_count < len(header) + 1:
+                        RESP_WS.add_cols(1)   # add one extra column
+                    
                     RESP_WS.update_cell(1, len(header) + 1, "Last Edited On")
                     header.append("Last Edited On")
+
         
                 # Ensure updated_row has correct length
                 if len(updated_row) < len(header):
