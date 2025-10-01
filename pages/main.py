@@ -405,6 +405,8 @@ tab = st.sidebar.radio("Menu", nav_options, index=0)
 # =========================
 # Page: Self-Assessment (teachers who haven't submitted yet)
 # =========================
+from descriptors import DESCRIPTORS  # 👈 make sure descriptors.py is in same folder
+
 if tab == "Self-Assessment":
     if already_submitted and not i_am_admin:
         # Auto-redirect teachers with submissions to My Submission
@@ -413,7 +415,7 @@ if tab == "Self-Assessment":
     else:
         # Welcome + Appraiser info
         me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0] if not users_df.empty else {}
-        appraiser = me.get("Appraiser","Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
+        appraiser = me.get("Appraiser", "Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
         st.sidebar.info(f"Your appraiser: **{appraiser}**")
 
         # 🔹 Load draft if exists
@@ -424,17 +426,37 @@ if tab == "Self-Assessment":
         # Selections (direct widgets so sidebar progress updates live)
         selections = {}
         reflections = {}
+
         for domain, items in DOMAINS.items():
             with st.expander(domain, expanded=False):
                 for code, label in items:
+                    strand_key = f"{code} {label}"
                     key = f"{code}-{label}"
-                    saved_value = draft_data.get(f"{code} {label}", "")
-                    selections[f"{code} {label}"] = st.radio(
-                        f"{code} — {label}",
+                    saved_value = draft_data.get(strand_key, "")
+
+                    # Radio for selecting rating
+                    selections[strand_key] = st.radio(
+                        f"{strand_key}",
                         RATINGS,
                         index=RATINGS.index(saved_value) if saved_value in RATINGS else None,
                         key=key,
                     ) or ""
+
+                    # 🔹 Show descriptors (auto-expand if no saved choice yet)
+                    if strand_key in DESCRIPTORS:
+                        expand_default = saved_value == ""  # open first time, collapse later
+                        with st.expander("📖 See descriptors for this strand", expanded=expand_default):
+                            st.markdown(f"""
+                            **Highly Effective (HE):** {DESCRIPTORS[strand_key]['HE']}  
+
+                            **Effective (E):** {DESCRIPTORS[strand_key]['E']}  
+
+                            **Improvement Necessary (IN):** {DESCRIPTORS[strand_key]['IN']}  
+
+                            **Does Not Meet Standards (DNMS):** {DESCRIPTORS[strand_key]['DNMS']}  
+                            """)
+
+                # Reflection box per domain (if enabled)
                 if ENABLE_REFLECTIONS:
                     saved_refl = draft_data.get(f"Reflection-{domain}", "")
                     reflections[domain] = st.text_area(
@@ -446,7 +468,7 @@ if tab == "Self-Assessment":
 
         # Submit button + progress
         selected_count = sum(1 for v in selections.values() if v)
-        col1, col2 = st.columns([1,3])
+        col1, col2 = st.columns([1, 3])
         with col1:
             submit = st.button(
                 "✅ Submit",
@@ -464,7 +486,7 @@ if tab == "Self-Assessment":
                             draft_payload[f"Reflection-{domain}"] = reflections.get(domain, "")
                     save_draft(st.session_state.auth_email, draft_payload)
                     st.success("✅ Draft saved!")
-           
+
                 # 🔗 Extra link under Save Draft
                 st.markdown(
                     """
