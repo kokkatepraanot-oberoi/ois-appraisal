@@ -586,19 +586,33 @@ if tab == "My Submission":
                     if col in lock_cols:
                         continue
                     current_value = latest.iloc[0][col]
-        
+                
+                    # Rubric strand columns (A–F, not reflections)
                     if any(col.startswith(x) for x in ["A", "B", "C", "D", "E", "F"]) and "Reflection" not in col:
-                        # Dropdown for rubric ratings
                         choice = st.selectbox(
                             col,
                             ["Highly Effective", "Effective", "Improvement Necessary", "Does Not Meet Standards"],
                             index=RATINGS.index(current_value) if current_value in RATINGS else 1
                         )
                         updated_row[latest.columns.get_loc(col)] = choice
+                
+                        # 🔹 Add descriptors expander under each strand
+                        if col in DESCRIPTORS:
+                            with st.expander("📖 See descriptors for this strand"):
+                                st.markdown(f"""
+                                **Highly Effective (HE):** {DESCRIPTORS[col]['HE']}  
+                
+                                **Effective (E):** {DESCRIPTORS[col]['E']}  
+                
+                                **Improvement Necessary (IN):** {DESCRIPTORS[col]['IN']}  
+                
+                                **Does Not Meet Standards (DNMS):** {DESCRIPTORS[col]['DNMS']}  
+                                """)
                     else:
                         # Reflections and free-text
                         text_val = st.text_area(col, value=current_value or "")
                         updated_row[latest.columns.get_loc(col)] = text_val
+
         
                 submitted = st.form_submit_button("💾 Save changes")
         
