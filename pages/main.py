@@ -456,6 +456,21 @@ if tab == "Self-Assessment":
                             **Does Not Meet Standards (DNMS):** {DESCRIPTORS[strand_key]['DNMS']}  
                             """)
 
+                    if code in DESCRIPTORS:
+                        with st.expander("📖 See descriptors for this strand", expanded=(saved_value == "")):
+                            st.markdown(
+                                f"""
+                                <div style="background-color:#f0f4ff; padding:15px; border-radius:10px; border:1px solid #d0d0d0;">
+                                    <p><b style="color:#2e7d32;">Highly Effective (HE):</b> {DESCRIPTORS[code]['HE']}</p>
+                                    <p><b style="color:#1565c0;">Effective (E):</b> {DESCRIPTORS[code]['E']}</p>
+                                    <p><b style="color:#ef6c00;">Improvement Necessary (IN):</b> {DESCRIPTORS[code]['IN']}</p>
+                                    <p><b style="color:#c62828;">Does Not Meet Standards (DNMS):</b> {DESCRIPTORS[code]['DNMS']}</p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+
                 # Reflection box per domain (if enabled)
                 if ENABLE_REFLECTIONS:
                     saved_refl = draft_data.get(f"Reflection-{domain}", "")
