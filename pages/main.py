@@ -443,24 +443,12 @@ if tab == "Self-Assessment":
                     ) or ""
 
                     # 🔹 Show descriptors (auto-expand if no saved choice yet)
-                    if strand_key in DESCRIPTORS:
-                        expand_default = saved_value == ""  # open first time, collapse later
-                        with st.expander("📖 See descriptors for this strand", expanded=expand_default):
-                            st.markdown(f"""
-                            **Highly Effective (HE):** {DESCRIPTORS[strand_key]['HE']}  
-
-                            **Effective (E):** {DESCRIPTORS[strand_key]['E']}  
-
-                            **Improvement Necessary (IN):** {DESCRIPTORS[strand_key]['IN']}  
-
-                            **Does Not Meet Standards (DNMS):** {DESCRIPTORS[strand_key]['DNMS']}  
-                            """)
-
+                    # 🔹 Descriptor expander with neutral highlight
                     if code in DESCRIPTORS:
                         with st.expander("📖 See descriptors for this strand", expanded=(saved_value == "")):
                             st.markdown(
                                 f"""
-                                <div style="background-color:#f0f4ff; padding:15px; border-radius:10px; border:1px solid #d0d0d0;">
+                                <div style="background-color:#f9f9f9; padding:15px; border-radius:10px; border:1px solid #ddd;">
                                     <p><b style="color:#2e7d32;">Highly Effective (HE):</b> {DESCRIPTORS[code]['HE']}</p>
                                     <p><b style="color:#1565c0;">Effective (E):</b> {DESCRIPTORS[code]['E']}</p>
                                     <p><b style="color:#ef6c00;">Improvement Necessary (IN):</b> {DESCRIPTORS[code]['IN']}</p>
@@ -469,7 +457,6 @@ if tab == "Self-Assessment":
                                 """,
                                 unsafe_allow_html=True
                             )
-
 
                 # Reflection box per domain (if enabled)
                 if ENABLE_REFLECTIONS:
