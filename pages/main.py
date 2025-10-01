@@ -552,7 +552,7 @@ if tab == "My Submission":
             row_index = latest.index[-1] + 2  # add 2 → header row + 0-based index
         
             st.divider()
-            st.subheader("✏️ Edit Your Submission")
+            st.subheader("✏️ Edit Your Submission (only in consultation with your appraiser")
         
             with st.form("edit_form"):
                 updated_row = list(latest.iloc[0].values)
