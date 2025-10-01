@@ -221,6 +221,7 @@ def expected_headers():
             headers.append(f"{code} {label}")
         if ENABLE_REFLECTIONS:
             headers.append(f"{domain} Reflection")
+    headers.append("Last Edited On")
     return headers
 
 @st.cache_resource
