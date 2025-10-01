@@ -546,6 +546,59 @@ if tab == "My Submission":
         styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
         st.dataframe(styled_latest, use_container_width=True)
 
+        if not my.empty:
+            latest = my.sort_values("Timestamp", ascending=False).head(1)
+            row_index = latest.index[-1] + 2  # add 2 → header row + 0-based index
+        
+            st.divider()
+            st.subheader("✏️ Edit Your Submission")
+        
+            with st.form("edit_form"):
+                updated_row = list(latest.iloc[0].values)
+        
+                # Columns that should not be editable
+                lock_cols = ["Timestamp", "Email", "Name", "Appraiser"]
+        
+                for col in latest.columns:
+                    if col in lock_cols:
+                        continue
+                    current_value = latest.iloc[0][col]
+        
+                    if any(col.startswith(x) for x in ["A", "B", "C", "D", "E", "F"]) and "Reflection" not in col:
+                        # Dropdown for rubric ratings
+                        choice = st.selectbox(
+                            col,
+                            ["Highly Effective", "Effective", "Improvement Necessary", "Does Not Meet Standards"],
+                            index=RATINGS.index(current_value) if current_value in RATINGS else 1
+                        )
+                        updated_row[latest.columns.get_loc(col)] = choice
+                    else:
+                        # Reflections and free-text
+                        text_val = st.text_area(col, value=current_value or "")
+                        updated_row[latest.columns.get_loc(col)] = text_val
+        
+                submitted = st.form_submit_button("💾 Save changes")
+        
+            if submitted:
+                # Add "Last Edited On" column if missing
+                header = with_backoff(RESP_WS.row_values, 1)
+                if "Last Edited On" not in header:
+                    RESP_WS.update_cell(1, len(header) + 1, "Last Edited On")
+                    header.append("Last Edited On")
+        
+                # Ensure updated_row has correct length
+                if len(updated_row) < len(header):
+                    updated_row.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                else:
+                    updated_row[header.index("Last Edited On")] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+                # Overwrite the row in Google Sheet
+                with_backoff(RESP_WS.update, f"A{row_index}:ZZ{row_index}", [updated_row])
+        
+                load_responses_df.clear()
+                st.success("✅ Your submission has been updated successfully!")
+                _rerun()
+        
         # ✅ All submissions for download (sorted)
         my_sorted = my.sort_values("Timestamp", ascending=False)
         csv = my_sorted.to_csv(index=False).encode("utf-8")
