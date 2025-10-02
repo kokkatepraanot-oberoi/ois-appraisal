@@ -406,6 +406,7 @@ tab = st.sidebar.radio("Menu", nav_options, index=0)
 # =========================
 # Page: Self-Assessment (teachers who haven't submitted yet)
 # =========================
+from descriptors import DESCRIPTORS  # 👈 make sure descriptors.py is in same folder
 
 if tab == "Self-Assessment":
     if already_submitted and not i_am_admin:
@@ -443,24 +444,18 @@ if tab == "Self-Assessment":
                     ) or ""
 
                     # 🔹 Show descriptors (auto-expand if no saved choice yet)
-                    # 🔹 Descriptor expander with neutral highlight
-                    # 🔹 Show descriptors (auto-expand if no saved choice yet)
-                    descs = DESCRIPTORS.get(code)
-                    if descs:
-                        with st.expander("📖 See descriptors for this strand", expanded=(saved_value == "")):
-                            st.markdown(
-                                f"""
-                                <div style="background-color:#f9f9f9; padding:15px; border-radius:10px; border:1px solid #ddd;">
-                                    <p><b style="color:#2e7d32;">Highly Effective (HE):</b> {descs['HE']}</p>
-                                    <p><b style="color:#1565c0;">Effective (E):</b> {descs['E']}</p>
-                                    <p><b style="color:#ef6c00;">Improvement Necessary (IN):</b> {descs['IN']}</p>
-                                    <p><b style="color:#c62828;">Does Not Meet Standards (DNMS):</b> {descs['DNMS']}</p>
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
+                    if strand_key in DESCRIPTORS:
+                        expand_default = saved_value == ""  # open first time, collapse later
+                        with st.expander("📖 See descriptors for this strand", expanded=expand_default):
+                            st.markdown(f"""
+                            **Highly Effective (HE):** {DESCRIPTORS[strand_key]['HE']}  
 
+                            **Effective (E):** {DESCRIPTORS[strand_key]['E']}  
 
+                            **Improvement Necessary (IN):** {DESCRIPTORS[strand_key]['IN']}  
+
+                            **Does Not Meet Standards (DNMS):** {DESCRIPTORS[strand_key]['DNMS']}  
+                            """)
 
                 # Reflection box per domain (if enabled)
                 if ENABLE_REFLECTIONS:
