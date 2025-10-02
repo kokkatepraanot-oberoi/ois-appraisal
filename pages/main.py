@@ -444,19 +444,22 @@ if tab == "Self-Assessment":
 
                     # 🔹 Show descriptors (auto-expand if no saved choice yet)
                     # 🔹 Descriptor expander with neutral highlight
-                    if code in DESCRIPTORS:
+                    # 🔹 Show descriptors (auto-expand if no saved choice yet)
+                    descs = DESCRIPTORS.get(code)
+                    if descs:
                         with st.expander("📖 See descriptors for this strand", expanded=(saved_value == "")):
                             st.markdown(
                                 f"""
                                 <div style="background-color:#f9f9f9; padding:15px; border-radius:10px; border:1px solid #ddd;">
-                                    <p><b style="color:#2e7d32;">Highly Effective (HE):</b> {DESCRIPTORS[code]['HE']}</p>
-                                    <p><b style="color:#1565c0;">Effective (E):</b> {DESCRIPTORS[code]['E']}</p>
-                                    <p><b style="color:#ef6c00;">Improvement Necessary (IN):</b> {DESCRIPTORS[code]['IN']}</p>
-                                    <p><b style="color:#c62828;">Does Not Meet Standards (DNMS):</b> {DESCRIPTORS[code]['DNMS']}</p>
+                                    <p><b style="color:#2e7d32;">Highly Effective (HE):</b> {descs['HE']}</p>
+                                    <p><b style="color:#1565c0;">Effective (E):</b> {descs['E']}</p>
+                                    <p><b style="color:#ef6c00;">Improvement Necessary (IN):</b> {descs['IN']}</p>
+                                    <p><b style="color:#c62828;">Does Not Meet Standards (DNMS):</b> {descs['DNMS']}</p>
                                 </div>
                                 """,
                                 unsafe_allow_html=True
                             )
+
 
 
                 # Reflection box per domain (if enabled)
