@@ -458,6 +458,7 @@ if tab == "Self-Assessment":
                                 unsafe_allow_html=True
                             )
 
+
                 # Reflection box per domain (if enabled)
                 if ENABLE_REFLECTIONS:
                     saved_refl = draft_data.get(f"Reflection-{domain}", "")
