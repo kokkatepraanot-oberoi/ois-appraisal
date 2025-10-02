@@ -673,9 +673,15 @@ if tab == "Admin" and i_am_admin:
         assigned = users_df[users_df["Role"] == "user"]  # all teachers
         st.info("Super Admin access: viewing **all teachers** in the school.")
     else:
-        assigned = users_df[
-            users_df["Appraiser"].str.strip().str.lower() == my_first
-        ] if not users_df.empty else pd.DataFrame()
+        # ✅ Updated block: allow multiple appraisers per teacher (comma-separated)
+        def matches_appraiser(cell):
+            if pd.isna(cell):
+                return False
+            appraisers = [a.strip().lower() for a in str(cell).split(",")]
+            return my_first in appraisers
+
+        assigned = users_df[users_df["Appraiser"].apply(matches_appraiser)] \
+                   if not users_df.empty else pd.DataFrame()
 
     if assigned.empty:
         st.info("No teachers found for your role in the Users sheet.")
@@ -762,8 +768,6 @@ if tab == "Admin" and i_am_admin:
                 )
             else:
                 st.info("ℹ️ No rubric submissions yet from your appraisees.")
-
-
 
         # Dropdown for deep dive
         st.divider()
