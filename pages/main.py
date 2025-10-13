@@ -9,23 +9,22 @@ import pandas as pd
 from descriptors import DESCRIPTORS
 
 # =========================
-# Descriptor Inline Helper (Streamlit-safe)
+# Helper: add descriptors as subheaders (inline under column names)
 # =========================
 
-def apply_inline_descriptors(df):
+def add_descriptor_subheaders(df):
     """
-    Adds concise Kim Marshall descriptors under each rubric column header.
-    Fully Streamlit-safe; works inside st.dataframe().
+    Append short Kim Marshall descriptors under each rubric column header.
+    Uses HE (Highly Effective) summary line for quick context.
     """
     new_cols = []
     for col in df.columns:
         code = col.split()[0] if " " in col else col
         if code in DESCRIPTORS:
-            short_desc = DESCRIPTORS[code]["HE"]  # show only the HE summary line
-            # truncate if long
-            if len(short_desc) > 80:
+            short_desc = DESCRIPTORS[code]["HE"]
+            if len(short_desc) > 80:  # truncate long ones
                 short_desc = short_desc[:77] + "..."
-            new_cols.append(f"{col}\n({short_desc})")
+            new_cols.append(f"{col}\n🛈 {short_desc}")
         else:
             new_cols.append(col)
     df.columns = new_cols
@@ -828,9 +827,30 @@ if tab == "Admin" and i_am_admin:
                     }
                     return colors.get(val, "")
         
-                styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
-                st.dataframe(styled_latest, use_container_width=True)
-        
+                # Add descriptor subheaders to rubric columns
+                latest_with_desc = add_descriptor_subheaders(latest.copy())
+                
+                # Replace long text with color-coded cells
+                def highlight_ratings(val):
+                    colors = {
+                        "HE": "background-color: #a8e6a1;",   # green
+                        "E": "background-color: #d0f0fd;",    # blue
+                        "IN": "background-color: #fff3b0;",   # yellow
+                        "DNMS": "background-color: #f8a5a5;"  # red
+                    }
+                    return colors.get(val, "")
+                
+                styled_latest = latest_with_desc.style.applymap(highlight_ratings, subset=latest_with_desc.columns[4:])
+                
+                # ✅ Use data_editor instead of dataframe so multiline headers render properly
+                st.data_editor(
+                    styled_latest.data,
+                    hide_index=True,
+                    disabled=True,
+                    use_container_width=True,
+                    column_config={c: st.column_config.TextColumn(c, width="medium") for c in latest_with_desc.columns},
+                )
+
                 st.divider()
                 csv = rows.to_csv(index=False).encode("utf-8")
                 st.download_button(
