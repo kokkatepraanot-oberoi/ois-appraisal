@@ -835,7 +835,7 @@ if tab == "Admin" and i_am_admin:
                 # =========================
                 
                 import streamlit.components.v1 as components
-                
+
                 record = latest.iloc[0].to_dict()
                 
                 rating_colors = {
@@ -855,39 +855,48 @@ if tab == "Admin" and i_am_admin:
                 """
                 
                 for col in rubric_cols:
-                    code = col.split()[0]
                     rating = record.get(col, "")
                 
-                    # Descriptor lookup
+                    # ✅ Use full strand key (fixes missing text issue)
                     descriptor = ""
-                    if code in DESCRIPTORS and rating in DESCRIPTORS[code]:
-                        descriptor = DESCRIPTORS[code][rating]
-                    elif code in DESCRIPTORS:
-                        descriptor = DESCRIPTORS[code]["HE"]
+                    if col in DESCRIPTORS and rating in DESCRIPTORS[col]:
+                        descriptor = DESCRIPTORS[col][rating]
+                    elif col in DESCRIPTORS:
+                        descriptor = DESCRIPTORS[col]["HE"]
                 
+                    # Truncate for visible preview
                     short_desc = (descriptor[:140] + "…") if len(descriptor) > 140 else descriptor
                     bg_color = rating_colors.get(rating, "#f8f9fa")
+                
+                    # 🧠 Add tooltip hover (full descriptor)
+                    safe_descriptor = descriptor.replace('"', '&quot;').replace("'", "&apos;")
                 
                     header_html += f"""
                       <th style='text-align:center; vertical-align:top; padding:10px; border:1px solid #ddd; width:180px;'>
                         <div style='font-weight:600; color:#111; font-size:13px; margin-bottom:5px; white-space:normal;'>{col}</div>
-                        <div style='background:{bg_color}; border-radius:6px; padding:6px; line-height:1.4em;
+                        <div title="{safe_descriptor}"
+                             style='background:{bg_color}; border-radius:6px; padding:6px; line-height:1.4em;
                                     font-size:11px; text-align:left; color:#111; min-height:60px; white-space:normal;
-                                    overflow-wrap:break-word;'>{short_desc}</div>
+                                    overflow-wrap:break-word; cursor:help;'>
+                            {short_desc}
+                        </div>
                       </th>
                     """
                 
                 header_html += "</tr></table></div>"
                 
-                # Render descriptor header
+                # ✅ Render HTML header
                 components.html(header_html, height=270, scrolling=True)
                 
+                                
                 # ✅ Then show the actual submission grid below
-                st.dataframe(styled_latest[["Timestamp", "Email", "Name", "Appraiser"] + rubric_cols], use_container_width=True)
+                st.dataframe(
+                    latest[["Timestamp", "Email", "Name", "Appraiser"] + rubric_cols].style.applymap(
+                        highlight_ratings, subset=rubric_cols
+                    ),
+                    use_container_width=True
+                )
 
-
-                # Display the color-coded data
-                st.dataframe(styled_latest, use_container_width=True)
         
                 # Download option
                 st.divider()
