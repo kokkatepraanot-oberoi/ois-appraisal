@@ -829,13 +829,10 @@ if tab == "Admin" and i_am_admin:
                 styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
         
                 # =========================
-                # Add descriptor headers (dynamic + color-coded + visible text)
+                # Descriptor header (dynamic + color-coded + renders properly)
                 # =========================
-                header_html = """
-                <div style='overflow-x:auto; white-space:nowrap;'>
-                  <table style='width:100%; border-collapse:collapse; table-layout:auto;'>
-                    <tr>
-                """
+                
+                import streamlit.components.v1 as components
                 
                 record = latest.iloc[0].to_dict()
                 
@@ -845,6 +842,9 @@ if tab == "Admin" and i_am_admin:
                     "IN": "#fff3b0",   # yellow
                     "DNMS": "#f8a5a5"  # red
                 }
+                
+                header_html = """<div style='overflow-x:auto;'>
+                <table style='width:100%; border-collapse:collapse; table-layout:auto;'><tr>"""
                 
                 for col in latest.columns:
                     code = col.split()[0] if " " in col else col
@@ -864,9 +864,9 @@ if tab == "Admin" and i_am_admin:
                     bg_color = rating_colors.get(rating, "#f8f9fa")
                 
                     header_html += f"""
-                      <th style='text-align:center; vertical-align:top; padding:8px;
-                                 background:#f8f9fa; border:1px solid #ddd; width:160px;'>
-                        <div style='font-weight:600; color:#111; font-size:13px; margin-bottom:4px; white-space:normal;'>
+                    <th style='text-align:center; vertical-align:top; padding:8px;
+                               background:#f8f9fa; border:1px solid #ddd; width:160px;'>
+                        <div style='font-weight:600; color:#111; font-size:13px; margin-bottom:4px;'>
                             {col}
                         </div>
                         <div title="{descriptor.replace('"','&quot;')}"
@@ -875,16 +875,14 @@ if tab == "Admin" and i_am_admin:
                                     overflow-wrap:break-word; text-align:left;'>
                             {short_desc}
                         </div>
-                      </th>
+                    </th>
                     """
                 
-                header_html += """
-                    </tr>
-                  </table>
-                </div>
-                """
+                header_html += "</tr></table></div>"
                 
-                st.markdown(header_html, unsafe_allow_html=True)
+                # ✅ Use HTML component (not markdown) so it renders properly
+                components.html(header_html, height=220, scrolling=True)
+
 
                 # Display the color-coded data
                 st.dataframe(styled_latest, use_container_width=True)
