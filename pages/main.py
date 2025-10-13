@@ -829,7 +829,7 @@ if tab == "Admin" and i_am_admin:
                 styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
         
                 # =========================
-                # Descriptor header (dynamic + color-coded + renders properly)
+                # Descriptor header (dynamic + color-coded + visible text)
                 # =========================
                 
                 import streamlit.components.v1 as components
@@ -847,6 +847,10 @@ if tab == "Admin" and i_am_admin:
                 <table style='width:100%; border-collapse:collapse; table-layout:auto;'><tr>"""
                 
                 for col in latest.columns:
+                    # ✅ Define code and rating
+                    code = col.split()[0] if " " in col else col
+                    rating = record.get(col, "")
+                
                     # 🔹 Choose descriptor based on rating
                     descriptor = ""
                     if code in DESCRIPTORS and rating in DESCRIPTORS[code]:
@@ -877,12 +881,12 @@ if tab == "Admin" and i_am_admin:
                         </div>
                     </th>
                     """
-
                 
                 header_html += "</tr></table></div>"
                 
-                # ✅ Use HTML component (not markdown) so it renders properly
-                components.html(header_html, height=220, scrolling=True)
+                # ✅ Use components.html (not st.markdown) so HTML renders correctly
+                components.html(header_html, height=240, scrolling=True)
+
 
 
                 # Display the color-coded data
