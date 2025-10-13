@@ -5,5 +5,7 @@ gspread
 fpdf2
 authlib
 PyJWT
+PyPDF2
+reportlab
 
 
