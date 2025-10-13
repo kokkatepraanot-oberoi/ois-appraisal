@@ -829,32 +829,54 @@ if tab == "Admin" and i_am_admin:
                 styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
         
                 # =========================
-                # Add descriptor headers (Highly Effective summaries)
+                # Add descriptor headers (dynamic + color-coded)
                 # =========================
                 header_html = "<div style='overflow-x:auto; white-space:nowrap;'>" \
                               "<table style='width:100%; border-collapse:collapse; table-layout:auto;'><tr>"
                 
+                # Grab latest submission record as a dict
+                record = latest.iloc[0].to_dict()
+                
+                # Define rating colors
+                rating_colors = {
+                    "HE": "#a8e6a1",   # green
+                    "E": "#d0f0fd",    # blue
+                    "IN": "#fff3b0",   # yellow
+                    "DNMS": "#f8a5a5"  # red
+                }
+                
                 for col in latest.columns:
                     code = col.split()[0] if " " in col else col
+                    rating = record.get(col, "")
                     descriptor = ""
-                    if code in DESCRIPTORS:
+                    
+                    # Descriptor lookup
+                    if code in DESCRIPTORS and rating in DESCRIPTORS[code]:
+                        descriptor = DESCRIPTORS[code][rating]
+                    elif code in DESCRIPTORS:
                         descriptor = DESCRIPTORS[code]["HE"]
-                        if len(descriptor) > 120:
-                            descriptor = descriptor[:117] + "…"
-                
+                    
+                    if len(descriptor) > 120:
+                        descriptor = descriptor[:117] + "…"
+                    
+                    # Color background for descriptor
+                    bg_color = rating_colors.get(rating, "#f8f9fa")
+                    
                     header_html += (
                         f"<th style='text-align:center; vertical-align:top; padding:6px; "
                         f"background:#f8f9fa; border:1px solid #ddd; width:150px; max-width:150px; "
                         f"overflow:hidden; white-space:nowrap; text-overflow:ellipsis;'>"
                         f"<div style='font-weight:600; color:#111; font-size:13px;'>{col}</div>"
-                        f"<div style='font-size:11px; color:#555; margin-top:4px; white-space:normal;'>{descriptor}</div>"
+                        f"<div style='font-size:11px; color:#333; background:{bg_color}; "
+                        f"border-radius:4px; padding:3px; margin-top:4px; white-space:normal;'>{descriptor}</div>"
                         f"</th>"
                     )
                 
                 header_html += "</tr></table></div>"
                 
-                # ✅ Render cleanly (no triple quotes, no indentation)
+                # ✅ Render cleanly
                 st.markdown(header_html, unsafe_allow_html=True)
+
 
 
         
