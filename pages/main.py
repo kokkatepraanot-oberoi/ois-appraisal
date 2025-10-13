@@ -9,31 +9,69 @@ import pandas as pd
 from descriptors import DESCRIPTORS
 
 # =========================
-# Descriptor Tooltip Helper
+# Descriptor Tooltip Helper (CSS Safe)
 # =========================
 from descriptors import DESCRIPTORS
 
 def apply_descriptor_tooltips(df):
     """
-    Adds Kim Marshall rubric descriptors as multi-line hover tooltips
-    for columns (A1–F9). Keeps other columns unchanged.
+    Adds CSS-based hover tooltips (multi-line) to column headers.
+    Works with st.dataframe() safely.
     """
-    new_cols = []
+    styled_cols = []
+    tooltips = {}
+
     for col in df.columns:
         code = col.split()[0] if " " in col else col
         if code in DESCRIPTORS:
             desc = DESCRIPTORS[code]
             tooltip = (
-                f"HE: {desc['HE']}\n"
-                f"E: {desc['E']}\n"
-                f"IN: {desc['IN']}\n"
-                f"DNMS: {desc['DNMS']}"
+                f"Highly Effective (HE): {desc['HE']}<br>"
+                f"Effective (E): {desc['E']}<br>"
+                f"Improvement Necessary (IN): {desc['IN']}<br>"
+                f"Does Not Meet Standards (DNMS): {desc['DNMS']}"
             )
-            new_cols.append(f"{col}<br><small title='{tooltip.replace('\"','')}'>🛈</small>")
+            styled_cols.append(f"{col} 🛈")
+            tooltips[f"{col} 🛈"] = tooltip
         else:
-            new_cols.append(col)
-    df.columns = new_cols
-    return df
+            styled_cols.append(col)
+
+    df.columns = styled_cols
+
+    # Create CSS hover tooltips
+    styles = [
+        {
+            "selector": "th",
+            "props": [
+                ("position", "relative"),
+                ("white-space", "nowrap"),
+            ]
+        },
+        {
+            "selector": "th:hover::after",
+            "props": [
+                ("content", "attr(title)"),
+                ("position", "absolute"),
+                ("bottom", "-5px"),
+                ("left", "0"),
+                ("background-color", "#f9f9f9"),
+                ("color", "#333"),
+                ("padding", "8px"),
+                ("border", "1px solid #ddd"),
+                ("border-radius", "6px"),
+                ("box-shadow", "0 2px 5px rgba(0,0,0,0.1)"),
+                ("white-space", "normal"),
+                ("z-index", "1000"),
+                ("width", "320px"),
+                ("font-size", "11px"),
+            ]
+        }
+    ]
+
+    styler = df.style.set_table_styles(styles)
+    styler.set_tooltips(tooltips, props="visibility: visible;")
+    return styler
+
 
 
 # =========================
@@ -784,8 +822,10 @@ if tab == "Admin" and i_am_admin:
                     }
                     return colors.get(val, "")
         
-                styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
+                styled_df = apply_descriptor_tooltips(df)
+                styled_df = styled_df.applymap(highlight_ratings, subset=df.columns[4:])
                 st.dataframe(styled_df, use_container_width=True)
+
 
         
                 st.download_button(
