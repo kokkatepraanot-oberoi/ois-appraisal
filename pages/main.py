@@ -6,8 +6,9 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
-from descriptors import DESCRIPTORS
 import re
+from descriptors import DESCRIPTORS
+
 
 # =========================
 # Helper: add descriptors as subheaders (inline under column names)
