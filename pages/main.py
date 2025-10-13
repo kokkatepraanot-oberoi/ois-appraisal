@@ -906,6 +906,8 @@ if tab == "Admin" and i_am_admin:
                 from reportlab.lib.utils import ImageReader
                 import matplotlib.pyplot as plt
                 import os
+
+                csv = rows.to_csv(index=False).encode("utf-8")
                 
                 def generate_teacher_pdf(teacher_name, latest_df):
                     """Overlay teacher name/date on rubric and attach visual grid summary."""
