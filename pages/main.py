@@ -871,22 +871,16 @@ if tab == "Admin" and i_am_admin:
                     # 🧠 Add tooltip hover (full descriptor)
                     safe_descriptor = descriptor.replace('"', '&quot;').replace("'", "&apos;")
                 
-                    header_html = """
-                    <div style='overflow-x:auto; max-height:280px;'>
-                      <style>
-                        th {
-                          position: sticky;
-                          top: 0;
-                          z-index: 2;
-                          background: #fff;
-                        }
-                        /* Optional scroll bar style */
-                        ::-webkit-scrollbar { height: 8px; }
-                        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
-                      </style>
-                    
-                      <table style='border-collapse:collapse; width:100%; table-layout:auto; font-family:Inter, sans-serif;'>
-                        <tr>
+                    header_html += f"""
+                      <th style='text-align:center; vertical-align:top; padding:10px; border:1px solid #ddd; width:180px;'>
+                        <div style='font-weight:600; color:#111; font-size:13px; margin-bottom:5px; white-space:normal;'>{col}</div>
+                        <div title="{safe_descriptor}"
+                             style='background:{bg_color}; border-radius:6px; padding:6px; line-height:1.4em;
+                                    font-size:11px; text-align:left; color:#111; min-height:60px; white-space:normal;
+                                    overflow-wrap:break-word; cursor:help;'>
+                            {short_desc}
+                        </div>
+                      </th>
                     """
 
                 
