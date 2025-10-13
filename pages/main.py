@@ -847,36 +847,36 @@ if tab == "Admin" and i_am_admin:
                 <table style='width:100%; border-collapse:collapse; table-layout:auto;'><tr>"""
                 
                 for col in latest.columns:
-                    # 🔹 Choose descriptor based on rating
-                    descriptor = ""
-                    if code in DESCRIPTORS and rating in DESCRIPTORS[code]:
-                        descriptor = DESCRIPTORS[code][rating]
-                    elif code in DESCRIPTORS:
-                        descriptor = DESCRIPTORS[code]["HE"]
-                
-                    # 🔹 Clean descriptor for display
-                    if len(descriptor) > 140:
-                        short_desc = descriptor[:137] + "…"
-                    else:
-                        short_desc = descriptor
-                
-                    bg_color = rating_colors.get(rating, "#f8f9fa")
-                
-                    header_html += f"""
-                    <th style='text-align:center; vertical-align:top; padding:8px;
-                               background:#f8f9fa; border:1px solid #ddd; width:160px;'>
-                        <div style='font-weight:600; color:#111; font-size:13px; margin-bottom:4px;'>
-                            {col}
-                        </div>
-                        <div title="{descriptor.replace('"','&quot;')}"
-                             style='font-size:11px; color:#111; background:{bg_color};
-                                    border-radius:6px; padding:5px; line-height:1.3em;
-                                    white-space:normal; overflow-wrap:break-word;
-                                    text-align:left; min-height:42px;'>
-                            {short_desc}
-                        </div>
-                    </th>
-                    """
+                        # 🔹 Choose descriptor based on rating
+                        descriptor = ""
+                        if code in DESCRIPTORS and rating in DESCRIPTORS[code]:
+                            descriptor = DESCRIPTORS[code][rating]
+                        elif code in DESCRIPTORS:
+                            descriptor = DESCRIPTORS[code]["HE"]
+                    
+                        # 🔹 Clean descriptor for display
+                        if len(descriptor) > 140:
+                            short_desc = descriptor[:137] + "…"
+                        else:
+                            short_desc = descriptor
+                    
+                        bg_color = rating_colors.get(rating, "#f8f9fa")
+                    
+                        header_html += f"""
+                        <th style='text-align:center; vertical-align:top; padding:8px;
+                                   background:#f8f9fa; border:1px solid #ddd; width:160px;'>
+                            <div style='font-weight:600; color:#111; font-size:13px; margin-bottom:4px;'>
+                                {col}
+                            </div>
+                            <div title="{descriptor.replace('"','&quot;')}"
+                                 style='font-size:11px; color:#111; background:{bg_color};
+                                        border-radius:6px; padding:5px; line-height:1.3em;
+                                        white-space:normal; overflow-wrap:break-word;
+                                        text-align:left; min-height:42px;'>
+                                {short_desc}
+                            </div>
+                        </th>
+                        """
 
                 
                 header_html += "</tr></table></div>"
