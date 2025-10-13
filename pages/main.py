@@ -831,11 +831,8 @@ if tab == "Admin" and i_am_admin:
                 # =========================
                 # Add descriptor headers (Highly Effective summaries)
                 # =========================
-                header_html = """
-                <div style='overflow-x:auto; white-space:nowrap;'>
-                  <table style='width:100%; border-collapse:collapse; table-layout:auto;'>
-                    <tr>
-                """
+                header_html = "<div style='overflow-x:auto; white-space:nowrap;'>" \
+                              "<table style='width:100%; border-collapse:collapse; table-layout:auto;'><tr>"
                 
                 for col in latest.columns:
                     code = col.split()[0] if " " in col else col
@@ -845,25 +842,20 @@ if tab == "Admin" and i_am_admin:
                         if len(descriptor) > 120:
                             descriptor = descriptor[:117] + "…"
                 
-                    # use nowrap + max-width + ellipsis
-                    header_html += f"""
-                      <th style='text-align:center; vertical-align:top; padding:6px;
-                                 background:#f8f9fa; border:1px solid #ddd; 
-                                 width:150px; max-width:150px; overflow:hidden; 
-                                 white-space:nowrap; text-overflow:ellipsis;'>
-                        <div style='font-weight:600; color:#111; font-size:13px;'>{col}</div>
-                        <div style='font-size:11px; color:#555; margin-top:4px; white-space:normal;'>{descriptor}</div>
-                      </th>
-                    """
+                    header_html += (
+                        f"<th style='text-align:center; vertical-align:top; padding:6px; "
+                        f"background:#f8f9fa; border:1px solid #ddd; width:150px; max-width:150px; "
+                        f"overflow:hidden; white-space:nowrap; text-overflow:ellipsis;'>"
+                        f"<div style='font-weight:600; color:#111; font-size:13px;'>{col}</div>"
+                        f"<div style='font-size:11px; color:#555; margin-top:4px; white-space:normal;'>{descriptor}</div>"
+                        f"</th>"
+                    )
                 
-                header_html += """
-                    </tr>
-                  </table>
-                </div>
-                """
+                header_html += "</tr></table></div>"
                 
-                # ✅ Render cleanly
+                # ✅ Render cleanly (no triple quotes, no indentation)
                 st.markdown(header_html, unsafe_allow_html=True)
+
 
         
                 # Display the color-coded data
