@@ -829,36 +829,39 @@ if tab == "Admin" and i_am_admin:
                 styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
         
                 # =========================
-                # Add descriptor headers (Highly Effective summaries)
+                # Proper HTML header table with descriptors
                 # =========================
-                header_html = """
-                <div style='overflow-x:auto;'>
-                <table style='width:100%; border-collapse:collapse; table-layout:fixed;'>
-                <tr>
-                """
+                header_html = (
+                    "<div style='overflow-x:auto;'>"
+                    "<table style='width:100%; border-collapse:collapse; table-layout:fixed;'>"
+                    "<tr>"
+                )
+        
                 for col in latest.columns:
                     code = col.split()[0] if " " in col else col
                     descriptor = ""
                     if code in DESCRIPTORS:
                         descriptor = DESCRIPTORS[code]["HE"]
-                        if len(descriptor) > 85:
-                            descriptor = descriptor[:82] + "..."
-                    header_html += f"""
-                        <th style='text-align:center; padding:6px; background:#f1f3f4; border:1px solid #ddd; width:auto;'>
-                            <div style='font-weight:bold; color:#333;'>{col}</div>
-                            <div style='font-size:11px; color:#666; margin-top:4px;'>{descriptor}</div>
-                        </th>
-                    """
-                header_html += """
-                </tr></table>
-                </div>
-                """
+                        if len(descriptor) > 90:
+                            descriptor = descriptor[:87] + "…"
         
-                # ✅ Use unsafe_allow_html=True to render correctly
+                    header_html += (
+                        f"<th style='text-align:center; vertical-align:top; padding:6px; "
+                        f"background:#f8f9fa; border:1px solid #ddd; width:auto;'>"
+                        f"<div style='font-weight:600; color:#111; font-size:13px;'>{col}</div>"
+                        f"<div style='font-size:11px; color:#555; margin-top:4px;'>{descriptor}</div>"
+                        f"</th>"
+                    )
+        
+                header_html += "</tr></table></div>"
+        
+                # ✅ Render as HTML (don’t use triple quotes!)
                 st.markdown(header_html, unsafe_allow_html=True)
+        
+                # Display the color-coded data
                 st.dataframe(styled_latest, use_container_width=True)
         
-                # Download option for this teacher
+                # Download option
                 st.divider()
                 csv = rows.to_csv(index=False).encode("utf-8")
                 st.download_button(
@@ -867,7 +870,7 @@ if tab == "Admin" and i_am_admin:
                     file_name=f"{teacher_choice}_submissions.csv",
                     mime="text/csv"
                 )
-        
+
 
     if st.button("🔄 Refresh Admin Data"):
         load_responses_df.clear()
