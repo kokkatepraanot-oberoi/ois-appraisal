@@ -7,5 +7,6 @@ authlib
 PyJWT
 pypdf
 reportlab
+matplotlib
 
 
