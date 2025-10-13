@@ -778,14 +778,57 @@ if tab == "Admin" and i_am_admin:
         if teacher_choice:
             teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
             rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
-
+        
             if rows.empty:
                 st.warning(f"No submission found for {teacher_choice}.")
             else:
                 st.subheader(f"Latest submission for {teacher_choice}")
                 latest = rows.sort_values("Timestamp", ascending=False).head(1)
-                st.dataframe(latest, use_container_width=True)
-
+        
+                # Display main table (color coded)
+                mapping = {
+                    "Highly Effective": "HE",
+                    "Effective": "E",
+                    "Improvement Necessary": "IN",
+                    "Does Not Meet Standards": "DNMS"
+                }
+                latest = latest.replace(mapping)
+        
+                def highlight_ratings(val):
+                    colors = {
+                        "HE": "background-color: #a8e6a1;",   # green
+                        "E": "background-color: #d0f0fd;",    # blue
+                        "IN": "background-color: #fff3b0;",   # yellow
+                        "DNMS": "background-color: #f8a5a5;"  # red
+                    }
+                    return colors.get(val, "")
+        
+                styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
+                st.dataframe(styled_latest, use_container_width=True)
+        
+                st.divider()
+                st.subheader("📘 View Strand Descriptors")
+        
+                # Show descriptors grouped by domain
+                for domain, items in DOMAINS.items():
+                    with st.expander(domain, expanded=False):
+                        for code, label in items:
+                            if code in DESCRIPTORS:
+                                descs = DESCRIPTORS[code]
+                                st.markdown(
+                                    f"""
+                                    <div style="background-color:#f9f9f9; padding:15px; border-radius:10px; border:1px solid #ddd; margin-bottom:10px;">
+                                        <b>{code} – {label}</b><br><br>
+                                        <b style="color:#2e7d32;">Highly Effective (HE):</b> {descs['HE']}<br>
+                                        <b style="color:#1565c0;">Effective (E):</b> {descs['E']}<br>
+                                        <b style="color:#ef6c00;">Improvement Necessary (IN):</b> {descs['IN']}<br>
+                                        <b style="color:#c62828;">Does Not Meet Standards (DNMS):</b> {descs['DNMS']}
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True
+                                )
+        
+                st.divider()
                 csv = rows.to_csv(index=False).encode("utf-8")
                 st.download_button(
                     f"⬇️ Download all submissions for {teacher_choice}",
@@ -793,6 +836,7 @@ if tab == "Admin" and i_am_admin:
                     file_name=f"{teacher_choice}_submissions.csv",
                     mime="text/csv"
                 )
+
 
     if st.button("🔄 Refresh Admin Data"):
         load_responses_df.clear()
