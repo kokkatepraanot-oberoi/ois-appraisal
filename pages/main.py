@@ -7,6 +7,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from descriptors import DESCRIPTORS
+import re
 
 # =========================
 # Helper: add descriptors as subheaders (inline under column names)
