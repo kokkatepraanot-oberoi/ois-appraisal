@@ -847,15 +847,14 @@ if tab == "Admin" and i_am_admin:
                 <table style='width:100%; border-collapse:collapse; table-layout:auto;'><tr>"""
                 
                 for col in latest.columns:
-                    code = col.split()[0] if " " in col else col
-                    rating = record.get(col, "")
+                    # 🔹 Choose descriptor based on rating
                     descriptor = ""
-                
                     if code in DESCRIPTORS and rating in DESCRIPTORS[code]:
                         descriptor = DESCRIPTORS[code][rating]
                     elif code in DESCRIPTORS:
                         descriptor = DESCRIPTORS[code]["HE"]
                 
+                    # 🔹 Clean descriptor for display
                     if len(descriptor) > 140:
                         short_desc = descriptor[:137] + "…"
                     else:
@@ -870,13 +869,15 @@ if tab == "Admin" and i_am_admin:
                             {col}
                         </div>
                         <div title="{descriptor.replace('"','&quot;')}"
-                             style='font-size:11px; color:#333; background:{bg_color};
-                                    border-radius:4px; padding:4px; white-space:normal;
-                                    overflow-wrap:break-word; text-align:left;'>
+                             style='font-size:11px; color:#111; background:{bg_color};
+                                    border-radius:6px; padding:5px; line-height:1.3em;
+                                    white-space:normal; overflow-wrap:break-word;
+                                    text-align:left; min-height:42px;'>
                             {short_desc}
                         </div>
                     </th>
                     """
+
                 
                 header_html += "</tr></table></div>"
                 
