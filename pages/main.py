@@ -983,7 +983,7 @@ if tab == "Admin" and i_am_admin:
                 
                 pdf_buffer = generate_teacher_pdf(teacher_choice, latest)
                 st.download_button(
-                    f"📄 Download {teacher_choice}'s Rubric PDF",
+                    f"📄 Download {teacher_choice}'s Rubric PDF (WIP!!!)",
                     data=pdf_buffer,
                     file_name=f"{teacher_choice}_rubric_{datetime.now().strftime('%Y%m%d')}.pdf",
                     mime="application/pdf"
