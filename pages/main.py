@@ -9,6 +9,34 @@ import pandas as pd
 from descriptors import DESCRIPTORS
 
 # =========================
+# Descriptor Tooltip Helper
+# =========================
+from descriptors import DESCRIPTORS
+
+def apply_descriptor_tooltips(df):
+    """
+    Adds Kim Marshall rubric descriptors as multi-line hover tooltips
+    for columns (A1–F9). Keeps other columns unchanged.
+    """
+    new_cols = []
+    for col in df.columns:
+        code = col.split()[0] if " " in col else col
+        if code in DESCRIPTORS:
+            desc = DESCRIPTORS[code]
+            tooltip = (
+                f"HE: {desc['HE']}\n"
+                f"E: {desc['E']}\n"
+                f"IN: {desc['IN']}\n"
+                f"DNMS: {desc['DNMS']}"
+            )
+            new_cols.append(f"{col}<br><small title='{tooltip.replace('\"','')}'>🛈</small>")
+        else:
+            new_cols.append(col)
+    df.columns = new_cols
+    return df
+
+
+# =========================
 # UI CONFIG (must be first)
 # =========================
 st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
