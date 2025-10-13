@@ -9,41 +9,27 @@ import pandas as pd
 from descriptors import DESCRIPTORS
 
 # =========================
-# Descriptor Tooltip Helper (Stable Streamlit-safe version)
+# Descriptor Inline Helper (Streamlit-safe)
 # =========================
 
-def apply_descriptor_tooltips(df):
+def apply_inline_descriptors(df):
     """
-    Adds CSS-based hover tooltips to strand column headers safely for st.dataframe().
-    Uses Styler + custom CSS (no set_tooltips error).
+    Adds concise Kim Marshall descriptors under each rubric column header.
+    Fully Streamlit-safe; works inside st.dataframe().
     """
-    styled_cols = []
-    tooltip_map = {}
-
+    new_cols = []
     for col in df.columns:
         code = col.split()[0] if " " in col else col
         if code in DESCRIPTORS:
-            desc = DESCRIPTORS[code]
-            tooltip_html = (
-                f"<b>Highly Effective (HE):</b> {desc['HE']}<br>"
-                f"<b>Effective (E):</b> {desc['E']}<br>"
-                f"<b>Improvement Necessary (IN):</b> {desc['IN']}<br>"
-                f"<b>Does Not Meet Standards (DNMS):</b> {desc['DNMS']}"
-            )
-            # add tooltip icon
-            styled_cols.append(f"<div title='{tooltip_html}'>{col} 🛈</div>")
+            short_desc = DESCRIPTORS[code]["HE"]  # show only the HE summary line
+            # truncate if long
+            if len(short_desc) > 80:
+                short_desc = short_desc[:77] + "..."
+            new_cols.append(f"{col}\n({short_desc})")
         else:
-            styled_cols.append(col)
-
-    df.columns = styled_cols
-
-    # ✅ Subtle background tint for tooltip columns
-    styles = [
-        {"selector": "th", "props": [("background-color", "#f8f9fa"), ("white-space", "nowrap")]},
-        {"selector": "table", "props": [("border-collapse", "collapse"), ("font-size", "13px")]},
-    ]
-
-    return df.style.set_table_styles(styles)
+            new_cols.append(col)
+    df.columns = new_cols
+    return df
 
 
 # =========================
@@ -794,13 +780,11 @@ if tab == "Admin" and i_am_admin:
                     }
                     return colors.get(val, "")
         
-                styled_df = apply_descriptor_tooltips(df)
-                styled_df = styled_df.applymap(highlight_ratings, subset=df.columns[4:])
+                df = apply_inline_descriptors(df)
+                styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
                 st.dataframe(styled_df, use_container_width=True)
 
-
-
-        
+                
                 st.download_button(
                     "📥 Download My Appraisees’ Grid (CSV)",
                     data=df.to_csv(index=False).encode("utf-8"),
