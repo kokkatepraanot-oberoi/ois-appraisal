@@ -912,7 +912,7 @@ if tab == "Admin" and i_am_admin:
                 def generate_teacher_pdf(teacher_name, latest_df):
                     """Overlay teacher name/date on rubric and attach visual grid summary."""
                     rubric_path = os.path.join(
-                        os.path.dirname(__file__),
+                        os.path.dirname(os.path.dirname(__file__)),
                         "Teacher Growth Rubric 2025-2026; Kim Marshall’s Teacher Evaluation.pdf"
                     )
                     reader = PdfReader(rubric_path)
