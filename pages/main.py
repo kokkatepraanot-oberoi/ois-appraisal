@@ -899,20 +899,24 @@ if tab == "Admin" and i_am_admin:
                 
                 # 📄 PDF Generation Section
                 from io import BytesIO
+                from datetime import datetime
                 from pypdf import PdfReader, PdfWriter
                 from reportlab.pdfgen import canvas
                 from reportlab.lib.pagesizes import letter
                 from reportlab.lib.utils import ImageReader
-                
-                csv = rows.to_csv(index=False).encode("utf-8")
+                import matplotlib.pyplot as plt
+                import os
                 
                 def generate_teacher_pdf(teacher_name, latest_df):
-                    """Overlay teacher name + date on rubric and attach ratings summary."""
-                    rubric_path = "Teacher Growth Rubric 2025-2026; Kim Marshall’s Teacher Evaluation.pdf"
+                    """Overlay teacher name/date on rubric and attach visual grid summary."""
+                    rubric_path = os.path.join(
+                        os.path.dirname(__file__),
+                        "Teacher Growth Rubric 2025-2026; Kim Marshall’s Teacher Evaluation.pdf"
+                    )
                     reader = PdfReader(rubric_path)
                     writer = PdfWriter()
                 
-                    # Create overlay with name/date
+                    # 🟢 Overlay teacher name + date on first page
                     overlay = BytesIO()
                     c = canvas.Canvas(overlay, pagesize=letter)
                     c.setFont("Helvetica-Bold", 12)
@@ -920,10 +924,8 @@ if tab == "Admin" and i_am_admin:
                     c.drawString(380, 750, f"Date: {datetime.now().strftime('%d %b %Y')}")
                     c.save()
                     overlay.seek(0)
-                
                     overlay_pdf = PdfReader(overlay)
                 
-                    # Merge overlay onto first page
                     first_page = reader.pages[0]
                     first_page.merge_page(overlay_pdf.pages[0])
                     writer.add_page(first_page)
@@ -932,29 +934,41 @@ if tab == "Admin" and i_am_admin:
                     for page in reader.pages[1:]:
                         writer.add_page(page)
                 
-                    # Append ratings summary (text page)
-                    summary = BytesIO()
-                    c = canvas.Canvas(summary, pagesize=letter)
-                    c.setFont("Helvetica-Bold", 14)
-                    c.drawString(220, 750, "Teacher Self-Assessment Summary")
-                    c.setFont("Helvetica", 10)
-                    y = 720
-                    for col in latest_df.columns[4:]:  # skip timestamp, etc.
-                        rating = str(latest_df.iloc[0][col])
-                        if y < 100:
-                            c.showPage(); y = 750
-                            c.setFont("Helvetica", 10)
-                        c.drawString(50, y, f"{col}: {rating}")
-                        y -= 14
-                    c.save()
-                    summary.seek(0)
-                    writer.append(PdfReader(summary))
+                    # 🟦 Create a visual grid from DataFrame
+                    plt.figure(figsize=(10, len(latest_df.columns) * 0.3))
+                    plt.axis('off')
+                    table = plt.table(
+                        cellText=latest_df.values,
+                        colLabels=latest_df.columns,
+                        loc='center',
+                        cellLoc='center'
+                    )
+                    table.auto_set_font_size(False)
+                    table.set_fontsize(6)
+                    plt.tight_layout()
                 
-                    # Return combined PDF as bytes
+                    img_buf = BytesIO()
+                    plt.savefig(img_buf, format="png", bbox_inches='tight', dpi=300)
+                    plt.close()
+                    img_buf.seek(0)
+                
+                    # 🖼️ Add the DataFrame image as a page
+                    grid_page = BytesIO()
+                    c = canvas.Canvas(grid_page, pagesize=letter)
+                    img = ImageReader(img_buf)
+                    c.drawImage(img, 40, 120, width=520, height=600, preserveAspectRatio=True)
+                    c.setFont("Helvetica-Bold", 14)
+                    c.drawString(200, 740, "Teacher Self-Assessment Grid Summary")
+                    c.save()
+                    grid_page.seek(0)
+                    writer.append(PdfReader(grid_page))
+                
+                    # Return the merged PDF
                     out = BytesIO()
                     writer.write(out)
                     out.seek(0)
                     return out
+
                 
                 
                 # ✅ CSV + PDF Download Buttons
