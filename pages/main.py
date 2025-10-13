@@ -829,15 +829,16 @@ if tab == "Admin" and i_am_admin:
                 styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
         
                 # =========================
-                # Add descriptor headers (dynamic + color-coded)
+                # Add descriptor headers (dynamic + color-coded + visible text)
                 # =========================
-                header_html = "<div style='overflow-x:auto; white-space:nowrap;'>" \
-                              "<table style='width:100%; border-collapse:collapse; table-layout:auto;'><tr>"
+                header_html = """
+                <div style='overflow-x:auto; white-space:nowrap;'>
+                  <table style='width:100%; border-collapse:collapse; table-layout:auto;'>
+                    <tr>
+                """
                 
-                # Grab latest submission record as a dict
                 record = latest.iloc[0].to_dict()
                 
-                # Define rating colors
                 rating_colors = {
                     "HE": "#a8e6a1",   # green
                     "E": "#d0f0fd",    # blue
@@ -849,37 +850,42 @@ if tab == "Admin" and i_am_admin:
                     code = col.split()[0] if " " in col else col
                     rating = record.get(col, "")
                     descriptor = ""
-                    
-                    # Descriptor lookup
+                
                     if code in DESCRIPTORS and rating in DESCRIPTORS[code]:
                         descriptor = DESCRIPTORS[code][rating]
                     elif code in DESCRIPTORS:
                         descriptor = DESCRIPTORS[code]["HE"]
-                    
-                    if len(descriptor) > 120:
-                        descriptor = descriptor[:117] + "…"
-                    
-                    # Color background for descriptor
+                
+                    if len(descriptor) > 140:
+                        short_desc = descriptor[:137] + "…"
+                    else:
+                        short_desc = descriptor
+                
                     bg_color = rating_colors.get(rating, "#f8f9fa")
-                    
-                    header_html += (
-                        f"<th style='text-align:center; vertical-align:top; padding:6px; "
-                        f"background:#f8f9fa; border:1px solid #ddd; width:150px; max-width:150px; "
-                        f"overflow:hidden; white-space:nowrap; text-overflow:ellipsis;'>"
-                        f"<div style='font-weight:600; color:#111; font-size:13px;'>{col}</div>"
-                        f"<div style='font-size:11px; color:#333; background:{bg_color}; "
-                        f"border-radius:4px; padding:3px; margin-top:4px; white-space:normal;'>{descriptor}</div>"
-                        f"</th>"
-                    )
                 
-                header_html += "</tr></table></div>"
+                    header_html += f"""
+                      <th style='text-align:center; vertical-align:top; padding:8px;
+                                 background:#f8f9fa; border:1px solid #ddd; width:160px;'>
+                        <div style='font-weight:600; color:#111; font-size:13px; margin-bottom:4px; white-space:normal;'>
+                            {col}
+                        </div>
+                        <div title="{descriptor.replace('"','&quot;')}"
+                             style='font-size:11px; color:#333; background:{bg_color};
+                                    border-radius:4px; padding:4px; white-space:normal;
+                                    overflow-wrap:break-word; text-align:left;'>
+                            {short_desc}
+                        </div>
+                      </th>
+                    """
                 
-                # ✅ Render cleanly
+                header_html += """
+                    </tr>
+                  </table>
+                </div>
+                """
+                
                 st.markdown(header_html, unsafe_allow_html=True)
 
-
-
-        
                 # Display the color-coded data
                 st.dataframe(styled_latest, use_container_width=True)
         
