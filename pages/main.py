@@ -794,9 +794,9 @@ if tab == "Admin" and i_am_admin:
         # Dropdown for deep dive
         st.divider()
         st.subheader("🔎 View Individual Submissions")
-
+        
         teacher_choice = st.selectbox("Select a teacher", assigned["Name"].tolist())
-
+        
         if teacher_choice:
             teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
             rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
@@ -807,7 +807,7 @@ if tab == "Admin" and i_am_admin:
                 st.subheader(f"Latest submission for {teacher_choice}")
                 latest = rows.sort_values("Timestamp", ascending=False).head(1)
         
-                # Display main table (color coded)
+                # Replace long ratings with short acronyms
                 mapping = {
                     "Highly Effective": "HE",
                     "Effective": "E",
@@ -816,6 +816,7 @@ if tab == "Admin" and i_am_admin:
                 }
                 latest = latest.replace(mapping)
         
+                # Apply color coding
                 def highlight_ratings(val):
                     colors = {
                         "HE": "background-color: #a8e6a1;",   # green
@@ -825,30 +826,32 @@ if tab == "Admin" and i_am_admin:
                     }
                     return colors.get(val, "")
         
-                # Add descriptor subheaders to rubric columns
-                latest_with_desc = add_descriptor_subheaders(latest.copy())
-                
-                # Replace long text with color-coded cells
-                def highlight_ratings(val):
-                    colors = {
-                        "HE": "background-color: #a8e6a1;",   # green
-                        "E": "background-color: #d0f0fd;",    # blue
-                        "IN": "background-color: #fff3b0;",   # yellow
-                        "DNMS": "background-color: #f8a5a5;"  # red
-                    }
-                    return colors.get(val, "")
-                
-                styled_latest = latest_with_desc.style.applymap(highlight_ratings, subset=latest_with_desc.columns[4:])
-                
-                # ✅ Use data_editor instead of dataframe so multiline headers render properly
-                st.data_editor(
-                    styled_latest.data,
-                    hide_index=True,
-                    disabled=True,
-                    use_container_width=True,
-                    column_config={c: st.column_config.TextColumn(c, width="medium") for c in latest_with_desc.columns},
-                )
-
+                styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
+        
+                # =========================
+                # Add descriptor headers (Highly Effective summaries)
+                # =========================
+                header_html = "<table style='width:100%; border-collapse:collapse;'><tr>"
+                for col in latest.columns:
+                    code = col.split()[0] if " " in col else col
+                    descriptor = ""
+                    if code in DESCRIPTORS:
+                        descriptor = DESCRIPTORS[code]["HE"]
+                        if len(descriptor) > 85:
+                            descriptor = descriptor[:82] + "..."
+                    header_html += f"""
+                        <th style='text-align:center; padding:6px; background:#f1f3f4; border:1px solid #ddd;'>
+                            <div style='font-weight:bold; color:#333;'>{col}</div>
+                            <div style='font-size:11px; color:#666; margin-top:4px;'>{descriptor}</div>
+                        </th>
+                    """
+                header_html += "</tr></table>"
+        
+                # Display the header + color-coded grid
+                st.markdown(header_html, unsafe_allow_html=True)
+                st.dataframe(styled_latest, use_container_width=True)
+        
+                # Download option for this teacher
                 st.divider()
                 csv = rows.to_csv(index=False).encode("utf-8")
                 st.download_button(
@@ -857,7 +860,7 @@ if tab == "Admin" and i_am_admin:
                     file_name=f"{teacher_choice}_submissions.csv",
                     mime="text/csv"
                 )
-
+        
 
     if st.button("🔄 Refresh Admin Data"):
         load_responses_df.clear()
