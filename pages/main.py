@@ -829,34 +829,42 @@ if tab == "Admin" and i_am_admin:
                 styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
         
                 # =========================
-                # Proper HTML header table with descriptors
+                # Add descriptor headers (Highly Effective summaries)
                 # =========================
-                header_html = (
-                    "<div style='overflow-x:auto;'>"
-                    "<table style='width:100%; border-collapse:collapse; table-layout:fixed;'>"
-                    "<tr>"
-                )
-        
+                header_html = """
+                <div style='overflow-x:auto; white-space:nowrap;'>
+                  <table style='width:100%; border-collapse:collapse; table-layout:auto;'>
+                    <tr>
+                """
+                
                 for col in latest.columns:
                     code = col.split()[0] if " " in col else col
                     descriptor = ""
                     if code in DESCRIPTORS:
                         descriptor = DESCRIPTORS[code]["HE"]
-                        if len(descriptor) > 90:
-                            descriptor = descriptor[:87] + "…"
-        
-                    header_html += (
-                        f"<th style='text-align:center; vertical-align:top; padding:6px; "
-                        f"background:#f8f9fa; border:1px solid #ddd; width:auto;'>"
-                        f"<div style='font-weight:600; color:#111; font-size:13px;'>{col}</div>"
-                        f"<div style='font-size:11px; color:#555; margin-top:4px;'>{descriptor}</div>"
-                        f"</th>"
-                    )
-        
-                header_html += "</tr></table></div>"
-        
-                # ✅ Render as HTML (don’t use triple quotes!)
+                        if len(descriptor) > 120:
+                            descriptor = descriptor[:117] + "…"
+                
+                    # use nowrap + max-width + ellipsis
+                    header_html += f"""
+                      <th style='text-align:center; vertical-align:top; padding:6px;
+                                 background:#f8f9fa; border:1px solid #ddd; 
+                                 width:150px; max-width:150px; overflow:hidden; 
+                                 white-space:nowrap; text-overflow:ellipsis;'>
+                        <div style='font-weight:600; color:#111; font-size:13px;'>{col}</div>
+                        <div style='font-size:11px; color:#555; margin-top:4px; white-space:normal;'>{descriptor}</div>
+                      </th>
+                    """
+                
+                header_html += """
+                    </tr>
+                  </table>
+                </div>
+                """
+                
+                # ✅ Render cleanly
                 st.markdown(header_html, unsafe_allow_html=True)
+
         
                 # Display the color-coded data
                 st.dataframe(styled_latest, use_container_width=True)
