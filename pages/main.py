@@ -831,7 +831,11 @@ if tab == "Admin" and i_am_admin:
                 # =========================
                 # Add descriptor headers (Highly Effective summaries)
                 # =========================
-                header_html = "<table style='width:100%; border-collapse:collapse;'><tr>"
+                header_html = """
+                <div style='overflow-x:auto;'>
+                <table style='width:100%; border-collapse:collapse; table-layout:fixed;'>
+                <tr>
+                """
                 for col in latest.columns:
                     code = col.split()[0] if " " in col else col
                     descriptor = ""
@@ -840,14 +844,17 @@ if tab == "Admin" and i_am_admin:
                         if len(descriptor) > 85:
                             descriptor = descriptor[:82] + "..."
                     header_html += f"""
-                        <th style='text-align:center; padding:6px; background:#f1f3f4; border:1px solid #ddd;'>
+                        <th style='text-align:center; padding:6px; background:#f1f3f4; border:1px solid #ddd; width:auto;'>
                             <div style='font-weight:bold; color:#333;'>{col}</div>
                             <div style='font-size:11px; color:#666; margin-top:4px;'>{descriptor}</div>
                         </th>
                     """
-                header_html += "</tr></table>"
+                header_html += """
+                </tr></table>
+                </div>
+                """
         
-                # Display the header + color-coded grid
+                # ✅ Use unsafe_allow_html=True to render correctly
                 st.markdown(header_html, unsafe_allow_html=True)
                 st.dataframe(styled_latest, use_container_width=True)
         
