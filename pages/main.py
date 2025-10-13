@@ -784,9 +784,8 @@ if tab == "Admin" and i_am_admin:
                     }
                     return colors.get(val, "")
         
-                df = apply_descriptor_tooltips(df)
                 styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
-                st.markdown(df.to_html(escape=False, index=False), unsafe_allow_html=True)
+                st.dataframe(styled_df, use_container_width=True)
 
         
                 st.download_button(
