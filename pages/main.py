@@ -779,10 +779,8 @@ if tab == "Admin" and i_am_admin:
                     }
                     return colors.get(val, "")
         
-                df = apply_inline_descriptors(df)
                 styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
                 st.dataframe(styled_df, use_container_width=True)
-
                 
                 st.download_button(
                     "📥 Download My Appraisees’ Grid (CSV)",
