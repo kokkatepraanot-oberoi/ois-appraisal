@@ -11,7 +11,6 @@ from descriptors import DESCRIPTORS
 # =========================
 # Descriptor Tooltip Helper (CSS Safe)
 # =========================
-from descriptors import DESCRIPTORS
 
 def apply_descriptor_tooltips(df):
     """
