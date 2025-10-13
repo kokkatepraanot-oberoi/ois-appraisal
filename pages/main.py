@@ -897,27 +897,22 @@ if tab == "Admin" and i_am_admin:
                     use_container_width=True
                 )
                 
-                # =========================
                 # 📄 PDF Generation Section
-                # =========================
                 from io import BytesIO
                 from pypdf import PdfReader, PdfWriter
                 from reportlab.pdfgen import canvas
                 from reportlab.lib.pagesizes import letter
+                from reportlab.lib.utils import ImageReader
+                
+                csv = rows.to_csv(index=False).encode("utf-8")
                 
                 def generate_teacher_pdf(teacher_name, latest_df):
                     """Overlay teacher name + date on rubric and attach ratings summary."""
                     rubric_path = "Teacher Growth Rubric 2025-2026; Kim Marshall’s Teacher Evaluation.pdf"
-                
-                    try:
-                        reader = PdfReader(rubric_path)
-                    except FileNotFoundError:
-                        st.error("⚠️ Rubric PDF not found. Please ensure it is in the same directory as main.py.")
-                        return None
-                
+                    reader = PdfReader(rubric_path)
                     writer = PdfWriter()
                 
-                    # Create overlay with teacher name and date
+                    # Create overlay with name/date
                     overlay = BytesIO()
                     c = canvas.Canvas(overlay, pagesize=letter)
                     c.setFont("Helvetica-Bold", 12)
@@ -928,48 +923,41 @@ if tab == "Admin" and i_am_admin:
                 
                     overlay_pdf = PdfReader(overlay)
                 
-                    # Merge overlay onto first page of rubric
+                    # Merge overlay onto first page
                     first_page = reader.pages[0]
                     first_page.merge_page(overlay_pdf.pages[0])
                     writer.add_page(first_page)
                 
-                    # Copy remaining rubric pages
+                    # Copy rest of rubric pages
                     for page in reader.pages[1:]:
                         writer.add_page(page)
                 
-                    # Append new summary page
+                    # Append ratings summary (text page)
                     summary = BytesIO()
                     c = canvas.Canvas(summary, pagesize=letter)
                     c.setFont("Helvetica-Bold", 14)
-                    c.drawString(200, 750, "Teacher Self-Assessment Summary")
+                    c.drawString(220, 750, "Teacher Self-Assessment Summary")
                     c.setFont("Helvetica", 10)
-                
                     y = 720
-                    for col in latest_df.columns[4:]:  # skip metadata columns
+                    for col in latest_df.columns[4:]:  # skip timestamp, etc.
                         rating = str(latest_df.iloc[0][col])
-                        if y < 100:  # start new page if needed
-                            c.showPage()
+                        if y < 100:
+                            c.showPage(); y = 750
                             c.setFont("Helvetica", 10)
-                            y = 750
                         c.drawString(50, y, f"{col}: {rating}")
                         y -= 14
-                
                     c.save()
                     summary.seek(0)
-                    summary_reader = PdfReader(summary)
-                    for page in summary_reader.pages:
-                        writer.add_page(page)
+                    writer.append(PdfReader(summary))
                 
-                    # Return combined PDF
+                    # Return combined PDF as bytes
                     out = BytesIO()
                     writer.write(out)
                     out.seek(0)
                     return out
                 
                 
-                # =========================
-                # Download buttons (CSV + PDF)
-                # =========================
+                # ✅ CSV + PDF Download Buttons
                 st.download_button(
                     f"⬇️ Download all submissions for {teacher_choice}",
                     data=csv,
@@ -978,13 +966,12 @@ if tab == "Admin" and i_am_admin:
                 )
                 
                 pdf_buffer = generate_teacher_pdf(teacher_choice, latest)
-                if pdf_buffer:
-                    st.download_button(
-                        f"📄 Download {teacher_choice}'s Rubric PDF",
-                        data=pdf_buffer,
-                        file_name=f"{teacher_choice}_rubric_{datetime.now().strftime('%Y%m%d')}.pdf",
-                        mime="application/pdf"
-                    )
+                st.download_button(
+                    f"📄 Download {teacher_choice}'s Rubric PDF",
+                    data=pdf_buffer,
+                    file_name=f"{teacher_choice}_rubric_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf"
+                )
 
 
 
