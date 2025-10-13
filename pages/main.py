@@ -901,7 +901,7 @@ if tab == "Admin" and i_am_admin:
                 # 📄 PDF Generation Section
                 # =========================
                 from io import BytesIO
-                from PyPDF2 import PdfReader, PdfWriter
+                from pypdf2 import PdfReader, PdfWriter
                 from reportlab.pdfgen import canvas
                 from reportlab.lib.pagesizes import letter
                 
