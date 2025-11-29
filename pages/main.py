@@ -1138,7 +1138,7 @@ if tab == "Super Admin" and i_am_sadmin:
 # Super Admin: Whole-School Submissions
 # =========================
 if tab == "Super Admin" and i_am_sadmin:
-    st.subheader("📊 Detailed Whole-School Submissions")
+    st.subheader("📊 Detailed Campus Submissions")
 
     # Fetch all responses
     df = load_responses_df()
@@ -1146,41 +1146,54 @@ if tab == "Super Admin" and i_am_sadmin:
     if df.empty:
         st.info("No submissions found yet.")
     else:
-        # Remove reflections & goals for compactness
-        reflection_cols = [c for c in df.columns if "Reflection" in c or "Goal" in c or "Comment" in c]
-        df = df.drop(columns=reflection_cols, errors="ignore")
+        # 🔹 Filter to my campus using Email → Users mapping
+        my_campus = str(st.session_state.get("auth_campus", "")).strip()
+        if "Campus" in users_df.columns and my_campus:
+            campus_map = users_df[["Email", "Campus"]].copy()
+            campus_map["Email"] = campus_map["Email"].astype(str).str.strip().str.lower()
+            campus_map["Campus"] = campus_map["Campus"].astype(str).str.strip()
 
-        # Reset index for numbering
-        df.index = df.index + 1
-        df.index.name = "No."
+            df = df.merge(campus_map, on="Email", how="left")
+            df = df[df["Campus"] == my_campus].drop(columns=["Campus"], errors="ignore")
 
-        # Replace full text with acronyms
-        mapping = {
-            "Highly Effective": "HE",
-            "Effective": "E",
-            "Improvement Necessary": "IN",
-            "Does Not Meet Standards": "DNMS"
-        }
-        df = df.replace(mapping)
+        if df.empty:
+            st.info(f"No submissions yet for **{my_campus}** campus.")
+        else:
+            # Remove reflections & goals for compactness
+            reflection_cols = [c for c in df.columns if "Reflection" in c or "Goal" in c or "Comment" in c]
+            df = df.drop(columns=reflection_cols, errors="ignore")
 
-        # Apply colors
-        def highlight_ratings(val):
-            colors = {
-                "HE": "background-color: #a8e6a1;",   # green
-                "E": "background-color: #d0f0fd;",    # blue
-                "IN": "background-color: #fff3b0;",   # yellow
-                "DNMS": "background-color: #f8a5a5;"  # red
+            # Reset index for numbering
+            df.index = df.index + 1
+            df.index.name = "No."
+
+            # Replace full text with acronyms
+            mapping = {
+                "Highly Effective": "HE",
+                "Effective": "E",
+                "Improvement Necessary": "IN",
+                "Does Not Meet Standards": "DNMS"
             }
-            return colors.get(val, "")
+            df = df.replace(mapping)
 
-        styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
+            # Apply colors
+            def highlight_ratings(val):
+                colors = {
+                    "HE": "background-color: #a8e6a1;",   # green
+                    "E": "background-color: #d0f0fd;",    # blue
+                    "IN": "background-color: #fff3b0;",   # yellow
+                    "DNMS": "background-color: #f8a5a5;"  # red
+                }
+                return colors.get(val, "")
 
-        st.dataframe(styled_df, use_container_width=True)
+            styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
 
-        # Download option
-        st.download_button(
-            "⬇️ Download all submissions (CSV)",
-            df.to_csv(index=True).encode("utf-8"),
-            "all_submissions.csv",
-            "text/csv"
-        )
+            st.dataframe(styled_df, use_container_width=True)
+
+            # Download option
+            st.download_button(
+                "⬇️ Download campus submissions (CSV)",
+                df.to_csv(index=True).encode("utf-8"),
+                "campus_submissions.csv",
+                "text/csv"
+            )
