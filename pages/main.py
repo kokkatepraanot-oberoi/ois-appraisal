@@ -9,16 +9,6 @@ import pandas as pd
 import re
 from descriptors import DESCRIPTORS
 
-# --- HIDE DEFAULT STREAMLIT PAGE SELECTOR ---
-st.markdown("""
-    <style>
-        /* Hide sidebar page navigation */
-        section[data-testid="stSidebarNav"] {display: none !important;}
-        /* Remove sidebar top padding so content starts at the very top */
-        div[data-testid="stSidebar"] > div:nth-child(1) {padding-top: 0rem !important;}
-    </style>
-""", unsafe_allow_html=True)
-
 # =========================
 # Helper: add descriptors as subheaders (inline under column names)
 # =========================
