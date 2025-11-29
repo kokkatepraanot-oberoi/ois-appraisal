@@ -421,6 +421,17 @@ if st.sidebar.button("🚪 **LOGOUT**", type="primary", use_container_width=True
     st.switch_page("app.py")
 
 
+# ============ TOP OF SIDEBAR: USER + CAMPUS ============
+user_name = st.session_state.get("auth_name", "")
+campus_label = st.session_state.get("auth_campus", "")
+
+with st.sidebar:
+    st.markdown("### 👤 Logged in as")
+    if user_name:
+        st.markdown(f"**{user_name}**")
+    if campus_label:
+        st.markdown(f"🏫 **{campus_label} Campus**")
+    st.markdown("---")
 
 # =========================
 # Sidebar: Live progress (no API calls)
@@ -438,18 +449,6 @@ with st.sidebar.expander("Progress", expanded=True):
     done = current_progress_from_session()
     st.progress(done / total_items if total_items else 0.0)
     st.caption(f"{done}/{total_items} sub‑strands completed")
-
-# NEW: show logged-in user + campus in sidebar
-user_name = st.session_state.get("auth_name", "")
-campus_label = st.session_state.get("auth_campus", "")
-
-if user_name or campus_label:
-    st.sidebar.markdown("### 👤 Logged in as")
-    if user_name:
-        st.sidebar.markdown(f"**{user_name}**")
-    if campus_label:
-        st.sidebar.markdown(f"🏫 **{campus_label} Campus**")
-    st.sidebar.markdown("---")
 
 # Main Nav
 st.title("🌟 OIS Teacher Self-Assessment 2025-26")
