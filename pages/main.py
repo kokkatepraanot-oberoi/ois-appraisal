@@ -409,9 +409,10 @@ if "auth_email" not in st.session_state or not st.session_state.auth_email:
     
 if st.sidebar.button("🚪 **LOGOUT**", type="primary", use_container_width=True):
     # Clear all login-related session keys
-    for key in ["token", "auth_email", "auth_name", "auth_role", "submitted"]:
+    for key in ["token", "auth_email", "auth_name", "auth_role", "auth_campus", "submitted"]:
         if key in st.session_state:
             del st.session_state[key]
+
 
     st.cache_data.clear()
     st.cache_resource.clear()
@@ -729,20 +730,40 @@ if tab == "Admin" and i_am_admin:
     my_role = me.get("Role", "").strip().lower()
     my_first = my_name.split()[0].strip().lower()
 
-    # Admins only see their assigned teachers, Super Admin sees all
+    # Campus-awareness
+    has_campus_col = "Campus" in users_df.columns
+    my_campus = str(me.get("Campus", "")).strip() if has_campus_col else ""
+    campus_series = (
+        users_df["Campus"].astype(str).str.strip()
+        if has_campus_col and my_campus
+        else None
+    )
+
+    # Admins only see their assigned teachers; Super Admin sees all teachers in *their campus*
     if my_role == "sadmin":
-        assigned = users_df[users_df["Role"] == "user"]  # all teachers
-        st.info("Super Admin access: viewing **all teachers** in the school.")
+        if campus_series is not None:
+            mask = (users_df["Role"] == "user") & (campus_series == my_campus)
+            assigned = users_df[mask]
+            st.info(f"Super Admin access: viewing **all teachers** in the **{my_campus}** campus.")
+        else:
+            assigned = users_df[users_df["Role"] == "user"]
+            st.info("Super Admin access: viewing **all teachers** in the school.")
     else:
-        # ✅ Updated block: allow multiple appraisers per teacher (comma-separated)
+        # allow multiple appraisers per teacher (comma-separated)
         def matches_appraiser(cell):
             if pd.isna(cell):
                 return False
             appraisers = [a.strip().lower() for a in str(cell).split(",")]
             return my_first in appraisers
 
-        assigned = users_df[users_df["Appraiser"].apply(matches_appraiser)] \
-                   if not users_df.empty else pd.DataFrame()
+        if not users_df.empty:
+            base_mask = users_df["Appraiser"].apply(matches_appraiser)
+            if campus_series is not None:
+                base_mask = base_mask & (campus_series == my_campus)
+            assigned = users_df[base_mask]
+        else:
+            assigned = pd.DataFrame()
+
 
     if assigned.empty:
         st.info("No teachers found for your role in the Users sheet.")
@@ -1031,9 +1052,23 @@ if tab == "Admin" and i_am_admin:
 # Page: Super Admin Panel
 # =========================
 if tab == "Super Admin" and i_am_sadmin:
-    st.header("🏫 Super Admin Panel — Whole School View")
+    st.header("🏫 Super Admin Panel — Campus View")
 
-    assigned = users_df[users_df["Role"] == "user"]  # all teachers
+    # Determine my campus (if configured)
+    my_campus = str(st.session_state.get("auth_campus", "") or "").strip()
+    has_campus_col = "Campus" in users_df.columns
+    campus_series = (
+        users_df["Campus"].astype(str).str.strip()
+        if has_campus_col and my_campus
+        else None
+    )
+
+    # Super admin sees all teachers in their own campus
+    if campus_series is not None:
+        assigned = users_df[(users_df["Role"] == "user") & (campus_series == my_campus)]
+    else:
+        assigned = users_df[users_df["Role"] == "user"]  # fallback: whole school
+
     resp_df = load_responses_df()
     summary_rows = []
 
