@@ -9,6 +9,16 @@ import pandas as pd
 import re
 from descriptors import DESCRIPTORS
 
+st.set_page_config(initial_sidebar_state="expanded", layout="wide")
+
+hide_pages_css = """
+    <style>
+        /* Hide Streamlit default page selector */
+        section[data-testid="stSidebarNav"] {display: none;}
+    </style>
+"""
+st.markdown(hide_pages_css, unsafe_allow_html=True)
+
 
 # =========================
 # Helper: add descriptors as subheaders (inline under column names)
