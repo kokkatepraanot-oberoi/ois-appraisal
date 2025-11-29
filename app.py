@@ -39,14 +39,23 @@ USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo"
 # =========================
 # Google Sheets: load Users
 # =========================
-@st.cache_data
 def get_users_df():
+    """Load Users sheet for login; normalise Email (and Campus if present)."""
     creds = Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
     client = gspread.authorize(creds)
     ws = client.open_by_key(SPREADSHEET_ID).worksheet("Users")
-    return pd.DataFrame(ws.get_all_records())
+    df = pd.DataFrame(ws.get_all_records())
+
+    if not df.empty:
+        if "Email" in df.columns:
+            df["Email"] = df["Email"].astype(str).str.strip().str.lower()
+        if "Campus" in df.columns:
+            df["Campus"] = df["Campus"].astype(str).str.strip()
+
+    return df
 
 users_df = get_users_df()
+
 
 # =========================
 # OAuth setup
@@ -77,13 +86,15 @@ if "token" in st.session_state and st.session_state["token"]:
             st.stop()
 
         row = match.iloc[0]
-        role = row.get("Role", "user").lower()
+        role = str(row.get("Role", "user")).lower().strip()
         name = row.get("Name", email)
+        campus = str(row.get("Campus", "")).strip()
 
         # Save session vars fresh every login
         st.session_state.auth_email = email
         st.session_state.auth_name = name
         st.session_state.auth_role = role
+        st.session_state.auth_campus = campus
 
         st.success(f"✅ Welcome {name} ({role}) — redirecting…")
         st.switch_page("pages/main.py")
