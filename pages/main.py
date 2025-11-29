@@ -439,29 +439,29 @@ with st.sidebar.expander("Progress", expanded=True):
     st.caption(f"{done}/{total_items} sub‑strands completed")
 
 # Main Nav
-st.title("🌟 OIS Teacher Self‑Assessment 2025‑26")
+st.title("🌟 OIS Teacher Self-Assessment 2025-26")
 
 if not st.session_state.auth_email:
     st.info("Please log in from the sidebar to continue.")
     st.stop()
 
 already_submitted = user_has_submission(st.session_state.auth_email)
-role = users_df.loc[users_df["Email"] == st.session_state.auth_email, "Role"].iloc[0].lower()
+
+# Look up my role (and campus, if configured) from the Users table
+me_row = users_df[users_df["Email"] == st.session_state.auth_email]
+if me_row.empty:
+    role = "user"
+    campus = ""
+else:
+    role = str(me_row.iloc[0].get("Role", "user")).lower().strip()
+    campus = str(me_row.iloc[0].get("Campus", "")).strip()
+
+# Mirror into session (login also sets this)
+st.session_state.auth_role = role
+st.session_state.auth_campus = campus
 
 i_am_admin = role == "admin"
 i_am_sadmin = role == "sadmin"
-
-if i_am_sadmin:
-    nav_options = ["Super Admin"]
-elif i_am_admin:
-    nav_options = ["Admin"]
-else:
-    if already_submitted:
-        nav_options = ["My Submission"]
-    else:
-        nav_options = ["Self-Assessment", "My Submission"]
-
-tab = st.sidebar.radio("Menu", nav_options, index=0)
 
 
 # =========================
