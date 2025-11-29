@@ -439,10 +439,17 @@ with st.sidebar.expander("Progress", expanded=True):
     st.progress(done / total_items if total_items else 0.0)
     st.caption(f"{done}/{total_items} sub‑strands completed")
 
-# NEW: show campus label in sidebar if known
-campus_label = st.session_state.get("auth_campus") or ""
-if campus_label:
-    st.sidebar.markdown(f"🏫 **{campus_label} Campus**")
+# NEW: show logged-in user + campus in sidebar
+user_name = st.session_state.get("auth_name", "")
+campus_label = st.session_state.get("auth_campus", "")
+
+if user_name or campus_label:
+    st.sidebar.markdown("### 👤 Logged in as")
+    if user_name:
+        st.sidebar.markdown(f"**{user_name}**")
+    if campus_label:
+        st.sidebar.markdown(f"🏫 **{campus_label} Campus**")
+    st.sidebar.markdown("---")
 
 # Main Nav
 st.title("🌟 OIS Teacher Self-Assessment 2025-26")
