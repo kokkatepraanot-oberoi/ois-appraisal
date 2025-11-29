@@ -410,7 +410,6 @@ with st.sidebar:
         st.markdown(f"**{user_name}**")
     if campus_label:
         st.markdown(f"🏫 **{campus_label} Campus**")
-    st.markdown("---")
     
 # =========================
 # AUTH: Account + Logout (from Google login in app.py)
