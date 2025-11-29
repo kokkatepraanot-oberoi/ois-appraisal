@@ -461,8 +461,23 @@ else:
 st.session_state.auth_role = role
 st.session_state.auth_campus = campus
 
-i_am_admin = role == "admin"
-i_am_sadmin = role == "sadmin"
+i_am_admin = (role == "admin")
+i_am_sadmin = (role == "sadmin")
+
+# Decide which tabs to show
+if i_am_sadmin:
+    nav_options = ["Super Admin"]
+elif i_am_admin:
+    nav_options = ["Admin"]
+else:
+    if already_submitted:
+        nav_options = ["My Submission"]
+    else:
+        nav_options = ["Self-Assessment", "My Submission"]
+
+# This defines `tab`
+tab = st.sidebar.radio("Menu", nav_options, index=0)
+
 
 
 # =========================
