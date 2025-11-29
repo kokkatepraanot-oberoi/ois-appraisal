@@ -400,6 +400,18 @@ def authenticate_user(email, password):
             return None, None
 
 
+# ============ TOP OF SIDEBAR: USER + CAMPUS ============
+user_name = st.session_state.get("auth_name", "")
+campus_label = st.session_state.get("auth_campus", "")
+
+with st.sidebar:
+    st.markdown("### 👤 Logged in as")
+    if user_name:
+        st.markdown(f"**{user_name}**")
+    if campus_label:
+        st.markdown(f"🏫 **{campus_label} Campus**")
+    st.markdown("---")
+    
 # =========================
 # AUTH: Account + Logout (from Google login in app.py)
 # =========================
@@ -420,18 +432,6 @@ if st.sidebar.button("🚪 **LOGOUT**", type="primary", use_container_width=True
     # Force redirect to app.py (login)
     st.switch_page("app.py")
 
-
-# ============ TOP OF SIDEBAR: USER + CAMPUS ============
-user_name = st.session_state.get("auth_name", "")
-campus_label = st.session_state.get("auth_campus", "")
-
-with st.sidebar:
-    st.markdown("### 👤 Logged in as")
-    if user_name:
-        st.markdown(f"**{user_name}**")
-    if campus_label:
-        st.markdown(f"🏫 **{campus_label} Campus**")
-    st.markdown("---")
 
 # =========================
 # Sidebar: Live progress (no API calls)
