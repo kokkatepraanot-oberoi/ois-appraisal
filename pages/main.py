@@ -282,33 +282,69 @@ def _pick_col(candidates: list[str], cols: list[str]):
 
 @st.cache_resource
 def load_users_once_df():
+    """
+    Load Users sheet once and normalise key columns, including Campus.
+
+    Expected logical columns (case-insensitive / fuzzy matched):
+      - Email
+      - Name
+      - Appraiser
+      - Role
+      - Password
+      - Campus  (NEW – optional; if missing or blank → treated as single-campus setup)
+    """
     records = with_backoff(USERS_WS.get_all_records)
     if not records:
-        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role", "Password"])
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role", "Password", "Campus"])
+
     df = pd.DataFrame(records)
     if df.empty:
-        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role", "Password"])
+        return pd.DataFrame(columns=["Email", "Name", "Appraiser", "Role", "Password", "Campus"])
 
     cols = list(df.columns)
 
-    email_header = _pick_col(["email","school email","work email","ois email","e-mail"], cols)
-    name_header = _pick_col(["name","full name","teacher name","staff name"], cols)
-    appraiser_header = _pick_col(["appraiser","line manager","manager","appraiser name","supervisor"], cols)
-    role_header = _pick_col(["role","access","admin"], cols)
-    password_header = _pick_col(["password","pwd","pass"], cols)   # 👈 NEW
+    email_header     = _pick_col(["email", "school email", "work email", "ois email", "e-mail"], cols)
+    name_header      = _pick_col(["name", "full name", "teacher name", "staff name"], cols)
+    appraiser_header = _pick_col(["appraiser", "line manager", "manager", "appraiser name", "supervisor"], cols)
+    role_header      = _pick_col(["role", "access", "admin"], cols)
+    password_header  = _pick_col(["password", "pwd", "pass"], cols)
+    campus_header    = _pick_col(["campus"], cols)  # NEW
 
     out = pd.DataFrame()
-    out["Email"] = df[email_header].astype(str).str.strip().str.lower() if email_header else ""
-    out["Name"] = df[name_header].astype(str).str.strip() if name_header else ""
-    out["Appraiser"] = (df[appraiser_header].astype(str).str.strip().replace({"": "Not Assigned"})
-                        if appraiser_header else "Not Assigned")
-    out["Role"] = df[role_header].astype(str).str.strip().str.lower() if role_header else ""
-    out["Password"] = df[password_header].astype(str).str.strip() if password_header else ""  # 👈 NEW
+
+    # Core columns
+    out["Email"] = (
+        df[email_header].astype(str).str.strip().str.lower()
+        if email_header else ""
+    )
+    out["Name"] = (
+        df[name_header].astype(str).str.strip()
+        if name_header else ""
+    )
+    out["Appraiser"] = (
+        df[appraiser_header].astype(str).str.strip().replace({"": "Not Assigned"})
+        if appraiser_header else "Not Assigned"
+    )
+    out["Role"] = (
+        df[role_header].astype(str).str.strip().str.lower()
+        if role_header else ""
+    )
+    out["Password"] = (
+        df[password_header].astype(str).str.strip()
+        if password_header else ""
+    )
+
+    # NEW: Campus (e.g. "JVLR" / "OGC")
+    out["Campus"] = (
+        df[campus_header].astype(str).str.strip()
+        if campus_header else ""
+    )
 
     return out
 
 
 users_df = load_users_once_df()
+
 
 # =========================
 # RESPONSES cache (for 'My submission' and Admin)
