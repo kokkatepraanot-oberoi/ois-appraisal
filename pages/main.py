@@ -1,4 +1,3 @@
-
 # main.py
 import time
 from datetime import datetime
@@ -12,7 +11,6 @@ from descriptors import DESCRIPTORS
 # =========================
 # Helper: add descriptors as subheaders (inline under column names)
 # =========================
-
 def add_descriptor_subheaders(df):
     """
     Append short Kim Marshall descriptors under each rubric column header.
@@ -35,7 +33,7 @@ def add_descriptor_subheaders(df):
 # =========================
 # UI CONFIG (must be first)
 # =========================
-st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
+st.set_page_config(page_title="OIS Teacher Self-Assessment", layout="wide")
 
 # Try to import HttpError; fall back gracefully if googleapiclient isn't present
 try:
@@ -43,6 +41,7 @@ try:
 except Exception:  # pragma: no cover
     class HttpError(Exception):
         pass
+
 
 # =========================
 # RERUN helper (Streamlit API changed)
@@ -63,6 +62,7 @@ ENABLE_REFLECTIONS = True  # set False to hide reflection boxes
 
 # Optional: list of admin emails (lowercase) in .streamlit/secrets.toml
 ADMINS_FROM_SECRETS = set([e.strip().lower() for e in st.secrets.get("admins", [])])
+
 
 # =========================
 # DOMAINS & SUB-STRANDS (exact from rubric)
@@ -143,6 +143,38 @@ RATINGS = [
     "Does Not Meet Standards",
 ]
 
+RATING_SHORT_MAP = {
+    "Highly Effective": "HE",
+    "Effective": "E",
+    "Improvement Necessary": "IN",
+    "Does Not Meet Standards": "DNMS",
+}
+
+RATING_STYLE_MAP = {
+    "HE": "background-color: #a8e6a1;",
+    "E": "background-color: #d0f0fd;",
+    "IN": "background-color: #fff3b0;",
+    "DNMS": "background-color: #f8a5a5;",
+}
+
+
+def highlight_ratings(val):
+    return RATING_STYLE_MAP.get(val, "")
+
+
+def abbreviate_ratings(df: pd.DataFrame) -> pd.DataFrame:
+    return df.replace(RATING_SHORT_MAP)
+
+
+def get_rating_subset(columns) -> list:
+    return [col for col in columns if re.match(r"^[A-F][0-9]", str(col))]
+
+
+def style_rating_dataframe(df: pd.DataFrame, subset=None):
+    rating_subset = subset if subset is not None else get_rating_subset(df.columns)
+    return df.style.map(highlight_ratings, subset=rating_subset)
+
+
 # =========================
 # Small retry/backoff for Sheets calls (handles 429/5xx)
 # =========================
@@ -157,26 +189,33 @@ def with_backoff(fn, *args, **kwargs):
         except HttpError as e:  # googleapiclient
             status = getattr(e, "status_code", None)
             if status in (429, 500, 502, 503, 504):
-                time.sleep(delay); delay *= 2; last_exc = e; continue
+                time.sleep(delay)
+                delay *= 2
+                last_exc = e
+                continue
             raise
         except gspread.exceptions.APIError as e:  # gspread-wrapped
             msg = str(e).lower()
             if any(code in msg for code in ["429", "500", "502", "503", "504"]):
-                time.sleep(delay); delay *= 2; last_exc = e; continue
+                time.sleep(delay)
+                delay *= 2
+                last_exc = e
+                continue
             raise
         except Exception as e:
-            time.sleep(delay); delay *= 2; last_exc = e; continue
+            time.sleep(delay)
+            delay *= 2
+            last_exc = e
+            continue
     if last_exc:
         raise last_exc
     return fn(*args, **kwargs)
+
 
 # =========================
 # ONE-TIME SHEETS CONNECTION (cached)
 # =========================
 @st.cache_resource
-# =========================
-# Google Sheet Connections
-# =========================
 def get_worksheets():
     client = gspread.authorize(
         Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
@@ -188,12 +227,13 @@ def get_worksheets():
     try:
         drafts_ws = sh.worksheet("Drafts")
     except gspread.exceptions.WorksheetNotFound:
-        # Create if missing
         drafts_ws = sh.add_worksheet(title="Drafts", rows="1000", cols="100")
         drafts_ws.update([["Email"]])  # initialize header
     return resp_ws, users_ws, drafts_ws
 
+
 RESP_WS, USERS_WS, DRAFTS_WS = get_worksheets()
+
 
 # =========================
 # DRAFT HELPERS
@@ -201,20 +241,16 @@ RESP_WS, USERS_WS, DRAFTS_WS = get_worksheets()
 def save_draft(email, form_data):
     """Update or append a draft for this teacher only."""
     try:
-        # Get all drafts (lightweight, header + values)
         all_drafts = DRAFTS_WS.get_all_records()
         emails = [row["Email"] for row in all_drafts]
 
         row_data = [email] + [form_data.get(f, "") for f in form_data.keys()]
 
         if email in emails:
-            # Update existing row (Google Sheets is 1-indexed and has a header row)
-            row_num = emails.index(email) + 2  
+            row_num = emails.index(email) + 2
             DRAFTS_WS.update(f"A{row_num}", [row_data])
         else:
-            # Append new row
-            if not all_drafts:  
-                # If sheet is empty except header, add header first
+            if not all_drafts:
                 headers = ["Email"] + list(form_data.keys())
                 DRAFTS_WS.append_row(headers, value_input_option="USER_ENTERED")
             DRAFTS_WS.append_row(row_data, value_input_option="USER_ENTERED")
@@ -236,6 +272,7 @@ def load_draft(email):
         return {}
     return {}
 
+
 # =========================
 # HEADER MANAGEMENT (safe, non-destructive)
 # =========================
@@ -248,6 +285,7 @@ def expected_headers():
             headers.append(f"{domain} Reflection")
     headers.append("Last Edited On")
     return headers
+
 
 @st.cache_resource
 def ensure_headers_once():
@@ -264,33 +302,30 @@ def ensure_headers_once():
         )
     return True
 
+
 ensure_headers_once()
 
+
 # =========================
-# USERS: read ONCE per server process (auto‑detect headers)
+# USERS: read ONCE per server process (auto-detect headers)
 # =========================
 def _pick_col(candidates: list[str], cols: list[str]):
     norm_map = {c.strip().lower(): c for c in cols}
     for want in candidates:
         key = want.strip().lower()
-        if key in norm_map: return norm_map[key]
+        if key in norm_map:
+            return norm_map[key]
     for c in cols:
         cl = c.strip().lower()
-        if any(w in cl for w in candidates): return c
+        if any(w in cl for w in candidates):
+            return c
     return None
+
 
 @st.cache_resource
 def load_users_once_df():
     """
     Load Users sheet once and normalise key columns, including Campus.
-
-    Expected logical columns (case-insensitive / fuzzy matched):
-      - Email
-      - Name
-      - Appraiser
-      - Role
-      - Password
-      - Campus  (NEW – optional; if missing or blank → treated as single-campus setup)
     """
     records = with_backoff(USERS_WS.get_all_records)
     if not records:
@@ -302,42 +337,23 @@ def load_users_once_df():
 
     cols = list(df.columns)
 
-    email_header     = _pick_col(["email", "school email", "work email", "ois email", "e-mail"], cols)
-    name_header      = _pick_col(["name", "full name", "teacher name", "staff name"], cols)
+    email_header = _pick_col(["email", "school email", "work email", "ois email", "e-mail"], cols)
+    name_header = _pick_col(["name", "full name", "teacher name", "staff name"], cols)
     appraiser_header = _pick_col(["appraiser", "line manager", "manager", "appraiser name", "supervisor"], cols)
-    role_header      = _pick_col(["role", "access", "admin"], cols)
-    password_header  = _pick_col(["password", "pwd", "pass"], cols)
-    campus_header    = _pick_col(["campus"], cols)  # NEW
+    role_header = _pick_col(["role", "access", "admin"], cols)
+    password_header = _pick_col(["password", "pwd", "pass"], cols)
+    campus_header = _pick_col(["campus"], cols)
 
     out = pd.DataFrame()
-
-    # Core columns
-    out["Email"] = (
-        df[email_header].astype(str).str.strip().str.lower()
-        if email_header else ""
-    )
-    out["Name"] = (
-        df[name_header].astype(str).str.strip()
-        if name_header else ""
-    )
+    out["Email"] = df[email_header].astype(str).str.strip().str.lower() if email_header else ""
+    out["Name"] = df[name_header].astype(str).str.strip() if name_header else ""
     out["Appraiser"] = (
         df[appraiser_header].astype(str).str.strip().replace({"": "Not Assigned"})
         if appraiser_header else "Not Assigned"
     )
-    out["Role"] = (
-        df[role_header].astype(str).str.strip().str.lower()
-        if role_header else ""
-    )
-    out["Password"] = (
-        df[password_header].astype(str).str.strip()
-        if password_header else ""
-    )
-
-    # NEW: Campus (e.g. "JVLR" / "OGC")
-    out["Campus"] = (
-        df[campus_header].astype(str).str.strip()
-        if campus_header else ""
-    )
+    out["Role"] = df[role_header].astype(str).str.strip().str.lower() if role_header else ""
+    out["Password"] = df[password_header].astype(str).str.strip() if password_header else ""
+    out["Campus"] = df[campus_header].astype(str).str.strip() if campus_header else ""
 
     return out
 
@@ -348,46 +364,46 @@ users_df = load_users_once_df()
 # =========================
 # RESPONSES cache (for 'My submission' and Admin)
 # =========================
-@st.cache_data(ttl=180)  # slightly longer to reduce bursts
+@st.cache_data(ttl=180)
 def load_responses_df():
     vals = with_backoff(RESP_WS.get_all_values)
     if not vals:
         return pd.DataFrame()
     header, rows = vals[0], vals[1:]
     df = pd.DataFrame(rows, columns=header) if rows else pd.DataFrame(columns=header)
-    # normalize
     if "Email" in df.columns:
         df["Email"] = df["Email"].astype(str).str.lower()
     return df
+
 
 def user_has_submission(email: str) -> bool:
     if not email:
         return False
     df = load_responses_df()
-    return (not df.empty) and ("Email" in df.columns) and (not df[df["Email"] == email.strip().lower()].empty)
+    return (
+        (not df.empty)
+        and ("Email" in df.columns)
+        and (not df[df["Email"] == email.strip().lower()].empty)
+    )
+
 
 # =========================
 # Authentication & Roles
 # =========================
 def authenticate_user(email, password):
     email = email.strip().lower()
-
-    # Look up in Users sheet
     user_row = users_df[users_df["Email"].str.lower() == email]
     if user_row.empty:
-        return None, None  # not found
+        return None, None
 
     role = user_row.iloc[0]["Role"].strip().lower()
 
-    # Admin check
     if role == "admin":
         return ("admin", user_row.iloc[0]) if password == "OIS2025" else (None, None)
 
-    # Superadmin check
     if role == "sadmin":
         return ("sadmin", user_row.iloc[0]) if password == "SOIS2025" else (None, None)
 
-    # Teacher check — validate against Password column
     if role == "user":
         stored_pw = str(user_row.iloc[0].get("Password", "")).strip()
         entered_pw = str(password).strip()
@@ -409,25 +425,22 @@ with st.sidebar:
         st.markdown(f"**{user_name}**")
     if campus_label:
         st.markdown(f"🏫 **{campus_label} Campus**")
-    
+
+
 # =========================
-# AUTH: Account + Logout (from Google login in app.py)
+# AUTH: Account + Logout
 # =========================
 if "auth_email" not in st.session_state or not st.session_state.auth_email:
     st.info("Please log in first.")
     st.stop()
-    
+
 if st.sidebar.button("🚪 **LOGOUT**", type="primary", use_container_width=True):
-    # Clear all login-related session keys
     for key in ["token", "auth_email", "auth_name", "auth_role", "auth_campus", "submitted"]:
         if key in st.session_state:
             del st.session_state[key]
 
-
     st.cache_data.clear()
     st.cache_resource.clear()
-
-    # Force redirect to app.py (login)
     st.switch_page("app.py")
 
 
@@ -435,6 +448,8 @@ if st.sidebar.button("🚪 **LOGOUT**", type="primary", use_container_width=True
 # Sidebar: Live progress (no API calls)
 # =========================
 total_items = sum(len(v) for v in DOMAINS.values())
+
+
 def current_progress_from_session() -> int:
     count = 0
     for _, items in DOMAINS.items():
@@ -443,10 +458,12 @@ def current_progress_from_session() -> int:
                 count += 1
     return count
 
+
 with st.sidebar.expander("Progress", expanded=True):
     done = current_progress_from_session()
     st.progress(done / total_items if total_items else 0.0)
-    st.caption(f"{done}/{total_items} sub‑strands completed")
+    st.caption(f"{done}/{total_items} sub-strands completed")
+
 
 # Main Nav
 st.title("🌟 OIS Teacher Self-Assessment 2025-26")
@@ -457,7 +474,6 @@ if not st.session_state.auth_email:
 
 already_submitted = user_has_submission(st.session_state.auth_email)
 
-# Look up my role (and campus, if configured) from the Users table
 me_row = users_df[users_df["Email"] == st.session_state.auth_email]
 if me_row.empty:
     role = "user"
@@ -466,14 +482,12 @@ else:
     role = str(me_row.iloc[0].get("Role", "user")).lower().strip()
     campus = str(me_row.iloc[0].get("Campus", "")).strip()
 
-# Mirror into session (login also sets this)
 st.session_state.auth_role = role
 st.session_state.auth_campus = campus
 
 i_am_admin = (role == "admin")
 i_am_sadmin = (role == "sadmin")
 
-# Decide which tabs to show
 if i_am_sadmin:
     nav_options = ["Super Admin"]
 elif i_am_admin:
@@ -484,33 +498,25 @@ else:
     else:
         nav_options = ["Self-Assessment", "My Submission"]
 
-# This defines `tab`
 tab = st.sidebar.radio("Menu", nav_options, index=0)
 
 
-
 # =========================
-# Page: Self-Assessment (teachers who haven't submitted yet)
+# Page: Self-Assessment
 # =========================
-from descriptors import DESCRIPTORS  # 👈 make sure descriptors.py is in same folder
-
 if tab == "Self-Assessment":
     if already_submitted and not i_am_admin:
-        # Auto-redirect teachers with submissions to My Submission
         st.success("✅ You’ve already submitted your self-assessment. Redirecting to your submission...")
         tab = "My Submission"
     else:
-        # Welcome + Appraiser info
         me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0] if not users_df.empty else {}
         appraiser = me.get("Appraiser", "Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
         st.sidebar.info(f"Your appraiser: **{appraiser}**")
 
-        # 🔹 Load draft if exists
         draft_data = load_draft(st.session_state.auth_email) or {}
         if draft_data:
             st.info("💾 A saved draft was found and preloaded. You can continue where you left off.")
 
-        # Selections (direct widgets so sidebar progress updates live)
         selections = {}
         reflections = {}
 
@@ -521,7 +527,6 @@ if tab == "Self-Assessment":
                     key = f"{code}-{label}"
                     saved_value = draft_data.get(strand_key, "")
 
-                    # Radio for selecting rating
                     selections[strand_key] = st.radio(
                         f"{strand_key}",
                         RATINGS,
@@ -529,9 +534,8 @@ if tab == "Self-Assessment":
                         key=key,
                     ) or ""
 
-                    # 🔹 Show descriptors (auto-expand if no saved choice yet)
                     if strand_key in DESCRIPTORS:
-                        expand_default = saved_value == ""  # open first time, collapse later
+                        expand_default = saved_value == ""
                         with st.expander("📖 See descriptors for this strand", expanded=expand_default):
                             st.markdown(f"""
                             **Highly Effective (HE):** {DESCRIPTORS[strand_key]['HE']}  
@@ -543,7 +547,6 @@ if tab == "Self-Assessment":
                             **Does Not Meet Standards (DNMS):** {DESCRIPTORS[strand_key]['DNMS']}  
                             """)
 
-                # Reflection box per domain (if enabled)
                 if ENABLE_REFLECTIONS:
                     saved_refl = draft_data.get(f"Reflection-{domain}", "")
                     reflections[domain] = st.text_area(
@@ -553,16 +556,15 @@ if tab == "Self-Assessment":
                         value=saved_refl,
                     )
 
-        # Submit button + progress
         selected_count = sum(1 for v in selections.values() if v)
         col1, col2 = st.columns([1, 3])
+
         with col1:
             submit = st.button(
                 "✅ Submit",
                 disabled=(selected_count < total_items) or st.session_state.get("submitted", False)
             )
 
-            # Sidebar: Save Draft
             with st.sidebar:
                 if st.button("💾 Save Draft", use_container_width=True):
                     draft_payload = {}
@@ -574,7 +576,6 @@ if tab == "Self-Assessment":
                     save_draft(st.session_state.auth_email, draft_payload)
                     st.success("✅ Draft saved!")
 
-                # 🔗 Extra link under Save Draft
                 st.markdown(
                     """
                     <br>
@@ -587,7 +588,6 @@ if tab == "Self-Assessment":
                     unsafe_allow_html=True
                 )
 
-        # Handle Submit
         if submit:
             row = [
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -612,13 +612,12 @@ if tab == "Self-Assessment":
 
 
 # =========================
-# Page: My Submission (teachers see their data here)
+# Page: My Submission
 # =========================
 if tab == "My Submission":
     df = load_responses_df()
     my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
 
-    # auto-refresh if cache stale
     if my.empty:
         load_responses_df.clear()
         df = load_responses_df()
@@ -629,106 +628,72 @@ if tab == "My Submission":
     if my.empty:
         st.info("No submission found yet.")
     else:
-        # ✅ Use "my" dataframe instead of teacher_choice/rows
         st.subheader("Latest submission")
 
         latest = my.sort_values("Timestamp", ascending=False).head(1)
+        latest_display = abbreviate_ratings(latest.copy())
+        st.dataframe(style_rating_dataframe(latest_display), use_container_width=True)
 
-        # 🔹 Replace full text with acronyms
-        mapping = {
-            "Highly Effective": "HE",
-            "Effective": "E",
-            "Improvement Necessary": "IN",
-            "Does Not Meet Standards": "DNMS"
-        }
-        latest = latest.replace(mapping)
+        latest = my.sort_values("Timestamp", ascending=False).head(1)
+        row_index = latest.index[-1] + 2
 
-        # 🔹 Apply same colors
-        def highlight_ratings(val):
-            colors = {
-                "HE": "background-color: #a8e6a1;",   # green
-                "E": "background-color: #d0f0fd;",    # blue
-                "IN": "background-color: #fff3b0;",   # yellow
-                "DNMS": "background-color: #f8a5a5;"  # red
-            }
-            return colors.get(val, "")
+        st.divider()
+        st.subheader("✏️ Edit Your Submission (only in consultation with your appraiser)")
 
-        styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
-        st.dataframe(styled_latest, use_container_width=True)
+        with st.form("edit_form"):
+            updated_row = list(latest.iloc[0].values)
+            lock_cols = ["Timestamp", "Email", "Name", "Appraiser"]
 
-        if not my.empty:
-            latest = my.sort_values("Timestamp", ascending=False).head(1)
-            row_index = latest.index[-1] + 2  # add 2 → header row + 0-based index
-        
-            st.divider()
-            st.subheader("✏️ Edit Your Submission (only in consultation with your appraiser)")
-        
-            with st.form("edit_form"):
-                updated_row = list(latest.iloc[0].values)
-        
-                # Columns that should not be editable
-                lock_cols = ["Timestamp", "Email", "Name", "Appraiser"]
-        
-                for col in latest.columns:
-                    if col in lock_cols:
-                        continue
-                    current_value = latest.iloc[0][col]
-                
-                    # Rubric strand columns (A–F, not reflections)
-                    if any(col.startswith(x) for x in ["A", "B", "C", "D", "E", "F"]) and "Reflection" not in col:
-                        choice = st.selectbox(
-                            col,
-                            ["Highly Effective", "Effective", "Improvement Necessary", "Does Not Meet Standards"],
-                            index=RATINGS.index(current_value) if current_value in RATINGS else 1
-                        )
-                        updated_row[latest.columns.get_loc(col)] = choice
-                
-                        # 🔹 Add descriptors expander under each strand
-                        if col in DESCRIPTORS:
-                            with st.expander("📖 See descriptors for this strand"):
-                                st.markdown(f"""
-                                **Highly Effective (HE):** {DESCRIPTORS[col]['HE']}  
-                
-                                **Effective (E):** {DESCRIPTORS[col]['E']}  
-                
-                                **Improvement Necessary (IN):** {DESCRIPTORS[col]['IN']}  
-                
-                                **Does Not Meet Standards (DNMS):** {DESCRIPTORS[col]['DNMS']}  
-                                """)
-                    else:
-                        # Reflections and free-text
-                        text_val = st.text_area(col, value=current_value or "")
-                        updated_row[latest.columns.get_loc(col)] = text_val
+            for col in latest.columns:
+                if col in lock_cols:
+                    continue
 
-        
-                submitted = st.form_submit_button("💾 Save changes")
-        
-            if submitted:
-                # Add "Last Edited On" column if missing
-                header = with_backoff(RESP_WS.row_values, 1)
-                if "Last Edited On" not in header:
-                    # Ensure the sheet has enough columns
-                    if RESP_WS.col_count < len(header) + 1:
-                        RESP_WS.add_cols(1)   # add one extra column
-                    
-                    RESP_WS.update_cell(1, len(header) + 1, "Last Edited On")
-                    header.append("Last Edited On")
+                current_value = latest.iloc[0][col]
 
-        
-                # Ensure updated_row has correct length
-                if len(updated_row) < len(header):
-                    updated_row.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                if any(col.startswith(x) for x in ["A", "B", "C", "D", "E", "F"]) and "Reflection" not in col:
+                    choice = st.selectbox(
+                        col,
+                        RATINGS,
+                        index=RATINGS.index(current_value) if current_value in RATINGS else 1
+                    )
+                    updated_row[latest.columns.get_loc(col)] = choice
+
+                    if col in DESCRIPTORS:
+                        with st.expander("📖 See descriptors for this strand"):
+                            st.markdown(f"""
+                            **Highly Effective (HE):** {DESCRIPTORS[col]['HE']}  
+
+                            **Effective (E):** {DESCRIPTORS[col]['E']}  
+
+                            **Improvement Necessary (IN):** {DESCRIPTORS[col]['IN']}  
+
+                            **Does Not Meet Standards (DNMS):** {DESCRIPTORS[col]['DNMS']}  
+                            """)
                 else:
-                    updated_row[header.index("Last Edited On")] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-                # Overwrite the row in Google Sheet
-                with_backoff(RESP_WS.update, f"A{row_index}:ZZ{row_index}", [updated_row])
-        
-                load_responses_df.clear()
-                st.success("✅ Your submission has been updated successfully!")
-                _rerun()
-        
-        # ✅ All submissions for download (sorted)
+                    text_val = st.text_area(col, value=current_value or "")
+                    updated_row[latest.columns.get_loc(col)] = text_val
+
+            submitted = st.form_submit_button("💾 Save changes")
+
+        if submitted:
+            header = with_backoff(RESP_WS.row_values, 1)
+            if "Last Edited On" not in header:
+                if RESP_WS.col_count < len(header) + 1:
+                    RESP_WS.add_cols(1)
+                RESP_WS.update_cell(1, len(header) + 1, "Last Edited On")
+                header.append("Last Edited On")
+
+            if len(updated_row) < len(header):
+                updated_row.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            else:
+                updated_row[header.index("Last Edited On")] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            with_backoff(RESP_WS.update, f"A{row_index}:ZZ{row_index}", [updated_row])
+
+            load_responses_df.clear()
+            st.success("✅ Your submission has been updated successfully!")
+            _rerun()
+
         my_sorted = my.sort_values("Timestamp", ascending=False)
         csv = my_sorted.to_csv(index=False).encode("utf-8")
         st.download_button(
@@ -744,7 +709,7 @@ if tab == "My Submission":
 
 
 # =========================
-# Page: Admin Panel (Admin & Super Admin)
+# Page: Admin Panel
 # =========================
 if tab == "Admin" and i_am_admin:
     st.header("👩‍💼 Admin Panel")
@@ -754,16 +719,10 @@ if tab == "Admin" and i_am_admin:
     my_role = me.get("Role", "").strip().lower()
     my_first = my_name.split()[0].strip().lower()
 
-    # Campus-awareness
     has_campus_col = "Campus" in users_df.columns
     my_campus = str(me.get("Campus", "")).strip() if has_campus_col else ""
-    campus_series = (
-        users_df["Campus"].astype(str).str.strip()
-        if has_campus_col and my_campus
-        else None
-    )
+    campus_series = users_df["Campus"].astype(str).str.strip() if has_campus_col and my_campus else None
 
-    # Admins only see their assigned teachers; Super Admin sees all teachers in *their campus*
     if my_role == "sadmin":
         if campus_series is not None:
             mask = (users_df["Role"] == "user") & (campus_series == my_campus)
@@ -773,7 +732,6 @@ if tab == "Admin" and i_am_admin:
             assigned = users_df[users_df["Role"] == "user"]
             st.info("Super Admin access: viewing **all teachers** in the school.")
     else:
-        # allow multiple appraisers per teacher (comma-separated)
         def matches_appraiser(cell):
             if pd.isna(cell):
                 return False
@@ -788,7 +746,6 @@ if tab == "Admin" and i_am_admin:
         else:
             assigned = pd.DataFrame()
 
-
     if assigned.empty:
         st.info("No teachers found for your role in the Users sheet.")
     else:
@@ -796,7 +753,6 @@ if tab == "Admin" and i_am_admin:
 
         resp_df = load_responses_df()
         summary_rows = []
-
         submitted_count = 0
         total_count = len(assigned)
 
@@ -822,49 +778,28 @@ if tab == "Admin" and i_am_admin:
 
         summary_df = pd.DataFrame(summary_rows)
 
-        # Compact progress display
-        col1, col2 = st.columns([1,2])
+        col1, col2 = st.columns([1, 2])
         with col1:
             st.markdown(
                 f"**Progress:** {submitted_count}/{total_count} submitted  "
-                f"({round((submitted_count/total_count)*100,1)}%)"
+                f"({round((submitted_count / total_count) * 100, 1)}%)"
             )
         with col2:
             st.progress(submitted_count / total_count if total_count else 0)
 
         st.dataframe(summary_df, use_container_width=True)
 
-        # 🔹 Submissions Grid (My Appraisees) with color coding
         st.divider()
         st.subheader("📊 Submissions Grid (My Appraisees)")
-        
+
         if not resp_df.empty:
             appraisee_emails = assigned["Email"].str.strip().str.lower().tolist()
             df = resp_df[resp_df["Email"].str.strip().str.lower().isin(appraisee_emails)]
-        
+
             if not df.empty:
-                # Replace full text with acronyms
-                mapping = {
-                    "Highly Effective": "HE",
-                    "Effective": "E",
-                    "Improvement Necessary": "IN",
-                    "Does Not Meet Standards": "DNMS"
-                }
-                df = df.replace(mapping)
-        
-                # Apply same colors as Super Admin
-                def highlight_ratings(val):
-                    colors = {
-                        "HE": "background-color: #a8e6a1;",   # green
-                        "E": "background-color: #d0f0fd;",    # blue
-                        "IN": "background-color: #fff3b0;",   # yellow
-                        "DNMS": "background-color: #f8a5a5;"  # red
-                    }
-                    return colors.get(val, "")
-        
-                styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
-                st.dataframe(styled_df, use_container_width=True)
-                
+                df_display = abbreviate_ratings(df.copy())
+                st.dataframe(style_rating_dataframe(df_display), use_container_width=True)
+
                 st.download_button(
                     "📥 Download My Appraisees’ Grid (CSV)",
                     data=df.to_csv(index=False).encode("utf-8"),
@@ -874,84 +809,54 @@ if tab == "Admin" and i_am_admin:
             else:
                 st.info("ℹ️ No rubric submissions yet from your appraisees.")
 
-        # Dropdown for deep dive
         st.divider()
         st.subheader("🔎 View Individual Submissions")
-        
+
         teacher_choice = st.selectbox("Select a teacher", assigned["Name"].tolist())
-        
+
         if teacher_choice:
             teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
             rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
-        
+
             if rows.empty:
                 st.warning(f"No submission found for {teacher_choice}.")
             else:
                 st.subheader(f"Latest submission for {teacher_choice}")
                 latest = rows.sort_values("Timestamp", ascending=False).head(1)
-        
-                # Replace long ratings with short acronyms
-                mapping = {
-                    "Highly Effective": "HE",
-                    "Effective": "E",
-                    "Improvement Necessary": "IN",
-                    "Does Not Meet Standards": "DNMS"
-                }
-                latest = latest.replace(mapping)
-        
-                # Apply color coding
-                def highlight_ratings(val):
-                    colors = {
-                        "HE": "background-color: #a8e6a1;",   # green
-                        "E": "background-color: #d0f0fd;",    # blue
-                        "IN": "background-color: #fff3b0;",   # yellow
-                        "DNMS": "background-color: #f8a5a5;"  # red
-                    }
-                    return colors.get(val, "")
-        
-                styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
-        
-                # =========================
-                # Descriptor Header + Data Table (Fully Working)
-                # =========================
-                
+                latest_display = abbreviate_ratings(latest.copy())
+
                 import streamlit.components.v1 as components
 
-                record = latest.iloc[0].to_dict()
-                
+                record = latest_display.iloc[0].to_dict()
+
                 rating_colors = {
-                    "HE": "#a8e6a1",   # green
-                    "E": "#d0f0fd",    # blue
-                    "IN": "#fff3b0",   # yellow
-                    "DNMS": "#f8a5a5"  # red
+                    "HE": "#a8e6a1",
+                    "E": "#d0f0fd",
+                    "IN": "#fff3b0",
+                    "DNMS": "#f8a5a5"
                 }
-                
-                # ✅ Only rubric columns (skip metadata)
-                rubric_cols = [col for col in latest.columns if re.match(r'^[A-F][0-9]', col)]
-                
+
+                rubric_cols = get_rating_subset(latest_display.columns)
+
                 header_html = """
                 <div style='overflow-x:auto;'>
                   <table style='border-collapse:collapse; width:100%; table-layout:auto; font-family:Inter, sans-serif;'>
                     <tr>
                 """
-                
+
                 for col in rubric_cols:
                     rating = record.get(col, "")
-                
-                    # ✅ Use full strand key (fixes missing text issue)
+
                     descriptor = ""
                     if col in DESCRIPTORS and rating in DESCRIPTORS[col]:
                         descriptor = DESCRIPTORS[col][rating]
                     elif col in DESCRIPTORS:
                         descriptor = DESCRIPTORS[col]["HE"]
-                
-                    # Truncate for visible preview
+
                     short_desc = (descriptor[:140] + "…") if len(descriptor) > 140 else descriptor
                     bg_color = rating_colors.get(rating, "#f8f9fa")
-                
-                    # 🧠 Add tooltip hover (full descriptor)
-                    safe_descriptor = descriptor.replace('"', '&quot;').replace("'", "&apos;")
-                
+                    safe_descriptor = descriptor.replace('"', "&quot;").replace("'", "&apos;")
+
                     header_html += f"""
                       <th style='text-align:center; vertical-align:top; padding:10px; border:1px solid #ddd; width:180px;'>
                         <div style='font-weight:600; color:#111; font-size:13px; margin-bottom:5px; white-space:normal;'>{col}</div>
@@ -964,23 +869,18 @@ if tab == "Admin" and i_am_admin:
                       </th>
                     """
 
-                
                 header_html += "</tr></table></div>"
-                
-                # ✅ Render HTML header
                 components.html(header_html, height=270, scrolling=True)
-                                
-                # ✅ Then show the actual submission grid below
+
                 st.dataframe(
-                    latest[["Timestamp", "Email", "Name", "Appraiser"] + rubric_cols].style.applymap(
-                        highlight_ratings, subset=rubric_cols
+                    style_rating_dataframe(
+                        latest_display[["Timestamp", "Email", "Name", "Appraiser"] + rubric_cols],
+                        subset=rubric_cols,
                     ),
                     use_container_width=True
                 )
-                
-                # 📄 PDF Generation Section
+
                 from io import BytesIO
-                from datetime import datetime
                 from pypdf import PdfReader, PdfWriter
                 from reportlab.pdfgen import canvas
                 from reportlab.lib.pagesizes import letter
@@ -989,7 +889,7 @@ if tab == "Admin" and i_am_admin:
                 import os
 
                 csv = rows.to_csv(index=False).encode("utf-8")
-                
+
                 def generate_teacher_pdf(teacher_name, latest_df):
                     """Overlay teacher name/date on rubric and attach visual grid summary."""
                     rubric_path = os.path.join(
@@ -998,8 +898,7 @@ if tab == "Admin" and i_am_admin:
                     )
                     reader = PdfReader(rubric_path)
                     writer = PdfWriter()
-                
-                    # 🟢 Overlay teacher name + date on first page
+
                     overlay = BytesIO()
                     c = canvas.Canvas(overlay, pagesize=letter)
                     c.setFont("Helvetica-Bold", 12)
@@ -1008,34 +907,31 @@ if tab == "Admin" and i_am_admin:
                     c.save()
                     overlay.seek(0)
                     overlay_pdf = PdfReader(overlay)
-                
+
                     first_page = reader.pages[0]
                     first_page.merge_page(overlay_pdf.pages[0])
                     writer.add_page(first_page)
-                
-                    # Copy rest of rubric pages
+
                     for page in reader.pages[1:]:
                         writer.add_page(page)
-                
-                    # 🟦 Create a visual grid from DataFrame
+
                     plt.figure(figsize=(10, len(latest_df.columns) * 0.3))
-                    plt.axis('off')
+                    plt.axis("off")
                     table = plt.table(
                         cellText=latest_df.values,
                         colLabels=latest_df.columns,
-                        loc='center',
-                        cellLoc='center'
+                        loc="center",
+                        cellLoc="center"
                     )
                     table.auto_set_font_size(False)
                     table.set_fontsize(6)
                     plt.tight_layout()
-                
+
                     img_buf = BytesIO()
-                    plt.savefig(img_buf, format="png", bbox_inches='tight', dpi=300)
+                    plt.savefig(img_buf, format="png", bbox_inches="tight", dpi=300)
                     plt.close()
                     img_buf.seek(0)
-                
-                    # 🖼️ Add the DataFrame image as a page
+
                     grid_page = BytesIO()
                     c = canvas.Canvas(grid_page, pagesize=letter)
                     img = ImageReader(img_buf)
@@ -1045,24 +941,20 @@ if tab == "Admin" and i_am_admin:
                     c.save()
                     grid_page.seek(0)
                     writer.append(PdfReader(grid_page))
-                
-                    # Return the merged PDF
+
                     out = BytesIO()
                     writer.write(out)
                     out.seek(0)
                     return out
 
-                
-                
-                # ✅ CSV + PDF Download Buttons
                 st.download_button(
                     f"⬇️ Download all submissions for {teacher_choice}",
                     data=csv,
                     file_name=f"{teacher_choice}_submissions.csv",
                     mime="text/csv"
                 )
-                
-                pdf_buffer = generate_teacher_pdf(teacher_choice, latest)
+
+                pdf_buffer = generate_teacher_pdf(teacher_choice, latest_display)
                 st.download_button(
                     f"📄 Download {teacher_choice}'s Rubric PDF (WIP!!!)",
                     data=pdf_buffer,
@@ -1071,31 +963,23 @@ if tab == "Admin" and i_am_admin:
                 )
 
 
-
 # =========================
 # Page: Super Admin Panel
 # =========================
 if tab == "Super Admin" and i_am_sadmin:
     st.header("🏫 Super Admin Panel — Campus View")
 
-    # Determine my campus (if configured)
     my_campus = str(st.session_state.get("auth_campus", "") or "").strip()
     has_campus_col = "Campus" in users_df.columns
-    campus_series = (
-        users_df["Campus"].astype(str).str.strip()
-        if has_campus_col and my_campus
-        else None
-    )
+    campus_series = users_df["Campus"].astype(str).str.strip() if has_campus_col and my_campus else None
 
-    # Super admin sees all teachers in their own campus
     if campus_series is not None:
         assigned = users_df[(users_df["Role"] == "user") & (campus_series == my_campus)]
     else:
-        assigned = users_df[users_df["Role"] == "user"]  # fallback: whole school
+        assigned = users_df[users_df["Role"] == "user"]
 
     resp_df = load_responses_df()
     summary_rows = []
-
     submitted_count = 0
     total_count = len(assigned)
 
@@ -1121,12 +1005,11 @@ if tab == "Super Admin" and i_am_sadmin:
 
     summary_df = pd.DataFrame(summary_rows)
 
-    # Compact progress display
-    col1, col2 = st.columns([1,2])
+    col1, col2 = st.columns([1, 2])
     with col1:
         st.markdown(
             f"**Progress:** {submitted_count}/{total_count} submitted  "
-            f"({round((submitted_count/total_count)*100,1)}%)"
+            f"({round((submitted_count / total_count) * 100, 1)}%)"
         )
     with col2:
         st.progress(submitted_count / total_count if total_count else 0)
@@ -1134,7 +1017,6 @@ if tab == "Super Admin" and i_am_sadmin:
     st.subheader("📋 Summary of All Teachers")
     st.dataframe(summary_df, use_container_width=True)
 
-    # Optional: download summary
     csv = summary_df.to_csv(index=False).encode("utf-8")
     st.download_button(
         "⬇️ Download Whole School Summary (CSV)",
@@ -1143,19 +1025,18 @@ if tab == "Super Admin" and i_am_sadmin:
         mime="text/csv"
     )
 
+
 # =========================
 # Super Admin: Whole-School Submissions
 # =========================
 if tab == "Super Admin" and i_am_sadmin:
     st.subheader("📊 Detailed Campus Submissions")
 
-    # Fetch all responses
     df = load_responses_df()
 
     if df.empty:
         st.info("No submissions found yet.")
     else:
-        # 🔹 Filter to my campus using Email → Users mapping
         my_campus = str(st.session_state.get("auth_campus", "")).strip()
         if "Campus" in users_df.columns and my_campus:
             campus_map = users_df[["Email", "Campus"]].copy()
@@ -1168,38 +1049,15 @@ if tab == "Super Admin" and i_am_sadmin:
         if df.empty:
             st.info(f"No submissions yet for **{my_campus}** campus.")
         else:
-            # Remove reflections & goals for compactness
             reflection_cols = [c for c in df.columns if "Reflection" in c or "Goal" in c or "Comment" in c]
             df = df.drop(columns=reflection_cols, errors="ignore")
 
-            # Reset index for numbering
             df.index = df.index + 1
             df.index.name = "No."
 
-            # Replace full text with acronyms
-            mapping = {
-                "Highly Effective": "HE",
-                "Effective": "E",
-                "Improvement Necessary": "IN",
-                "Does Not Meet Standards": "DNMS"
-            }
-            df = df.replace(mapping)
+            df_display = abbreviate_ratings(df.copy())
+            st.dataframe(style_rating_dataframe(df_display), use_container_width=True)
 
-            # Apply colors
-            def highlight_ratings(val):
-                colors = {
-                    "HE": "background-color: #a8e6a1;",   # green
-                    "E": "background-color: #d0f0fd;",    # blue
-                    "IN": "background-color: #fff3b0;",   # yellow
-                    "DNMS": "background-color: #f8a5a5;"  # red
-                }
-                return colors.get(val, "")
-
-            styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
-
-            st.dataframe(styled_df, use_container_width=True)
-
-            # Download option
             st.download_button(
                 "⬇️ Download campus submissions (CSV)",
                 df.to_csv(index=True).encode("utf-8"),
