@@ -1096,17 +1096,19 @@ if tab == "Admin" and i_am_admin:
                     mime="text/csv"
                 )
 
-                # Use the original latest submission with full rating text, not the HE/E/IN/DNMS version
                 latest_export = rows.sort_values("Timestamp", ascending=False).head(1).copy()
 
-                docx_buffer = generate_teacher_docx(teacher_choice, latest_export)
-
-                st.download_button(
-                    f"📄 Download {teacher_choice}'s Self-Assessment (DOCX)",
-                    data=docx_buffer,
-                    file_name=f"{teacher_choice}_self_assessment_{datetime.now().strftime('%Y%m%d')}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+                try:
+                    docx_buffer = generate_teacher_docx(teacher_choice, latest_export)
+                
+                    st.download_button(
+                        f"📄 Download {teacher_choice}'s Self-Assessment (DOCX)",
+                        data=docx_buffer,
+                        file_name=f"{teacher_choice}_self_assessment_{datetime.now().strftime('%Y%m%d')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+                except Exception as e:
+                    st.error(f"Could not generate DOCX for {teacher_choice}: {e}")
                 
                 
 
