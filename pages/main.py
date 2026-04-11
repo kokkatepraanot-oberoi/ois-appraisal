@@ -8,6 +8,8 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 import re
 from descriptors import DESCRIPTORS
+from io import BytesIO
+from docx import Document
 
 # =========================
 # Helper: add descriptors as subheaders (inline under column names)
@@ -979,7 +981,7 @@ if tab == "Admin" and i_am_admin:
                 )
                 
                 # 📄 PDF Generation Section
-                from io import BytesIO
+                
                 from datetime import datetime
                 from pypdf import PdfReader, PdfWriter
                 from reportlab.pdfgen import canvas
