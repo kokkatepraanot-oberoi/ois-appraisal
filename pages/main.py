@@ -653,7 +653,7 @@ if tab == "My Submission":
             }
             return colors.get(val, "")
 
-        styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
+        styled_latest = latest.style.map(highlight_ratings, subset=latest.columns[4:])
         st.dataframe(styled_latest, use_container_width=True)
 
         if not my.empty:
@@ -862,7 +862,7 @@ if tab == "Admin" and i_am_admin:
                     }
                     return colors.get(val, "")
         
-                styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
+                styled_df = df.style.map(highlight_ratings, subset=df.columns[4:])
                 st.dataframe(styled_df, use_container_width=True)
                 
                 st.download_button(
@@ -909,7 +909,7 @@ if tab == "Admin" and i_am_admin:
                     }
                     return colors.get(val, "")
         
-                styled_latest = latest.style.applymap(highlight_ratings, subset=latest.columns[4:])
+                styled_latest = latest.style.map(highlight_ratings, subset=latest.columns[4:])
         
                 # =========================
                 # Descriptor Header + Data Table (Fully Working)
@@ -972,7 +972,7 @@ if tab == "Admin" and i_am_admin:
                                 
                 # ✅ Then show the actual submission grid below
                 st.dataframe(
-                    latest[["Timestamp", "Email", "Name", "Appraiser"] + rubric_cols].style.applymap(
+                    latest[["Timestamp", "Email", "Name", "Appraiser"] + rubric_cols].style.map(
                         highlight_ratings, subset=rubric_cols
                     ),
                     use_container_width=True
@@ -1195,7 +1195,7 @@ if tab == "Super Admin" and i_am_sadmin:
                 }
                 return colors.get(val, "")
 
-            styled_df = df.style.applymap(highlight_ratings, subset=df.columns[4:])
+            styled_df = df.style.map(highlight_ratings, subset=df.columns[4:])
 
             st.dataframe(styled_df, use_container_width=True)
 
