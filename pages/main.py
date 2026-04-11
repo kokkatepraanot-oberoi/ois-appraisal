@@ -1,15 +1,17 @@
 
 # main.py
 import time
+import os
+from io import BytesIO
 from datetime import datetime
+
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 import re
-from descriptors import DESCRIPTORS
-from io import BytesIO
 from docx import Document
+from descriptors import DESCRIPTORS
 
 # =========================
 # Helper: add descriptors as subheaders (inline under column names)
