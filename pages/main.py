@@ -33,6 +33,106 @@ def add_descriptor_subheaders(df):
     df.columns = new_cols
     return df
 
+def safe_text(value):
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value)
+
+
+def replace_name_and_date_in_template(doc, teacher_name, date_str):
+    """
+    Replaces the first Name / Date placeholders in the uploaded DOCX template.
+    """
+    for p in doc.paragraphs:
+        txt = p.text
+        if "Name:" in txt and "Date:" in txt:
+            txt = re.sub(r"Name:\s*_+", f"Name: {teacher_name}", txt)
+            txt = re.sub(r"Date:\s*_+", f"Date: {date_str}", txt)
+            p.text = txt
+            return
+
+    # fallback if not found in same paragraph
+    for p in doc.paragraphs:
+        if "Name:" in p.text:
+            p.text = re.sub(r"Name:\s*_+", f"Name: {teacher_name}", p.text)
+        if "Date:" in p.text:
+            p.text = re.sub(r"Date:\s*_+", f"Date: {date_str}", p.text)
+
+
+def add_summary_section_to_doc(doc, latest_record):
+    """
+    Appends a clean, appraiser-friendly summary of the teacher's submitted ratings
+    and reflections to the end of the template document.
+    """
+    doc.add_page_break()
+    doc.add_heading("Teacher Self-Assessment Submission Summary", level=1)
+
+    meta = doc.add_paragraph()
+    meta.add_run("Teacher: ").bold = True
+    meta.add_run(safe_text(latest_record.get("Name", "")))
+    meta.add_run("\nAppraiser: ").bold = True
+    meta.add_run(safe_text(latest_record.get("Appraiser", "")))
+    meta.add_run("\nSubmitted on: ").bold = True
+    meta.add_run(safe_text(latest_record.get("Timestamp", "")))
+    meta.add_run("\nLast edited on: ").bold = True
+    meta.add_run(safe_text(latest_record.get("Last Edited On", "")))
+
+    for domain, items in DOMAINS.items():
+        doc.add_heading(domain, level=2)
+
+        table = doc.add_table(rows=1, cols=3)
+        table.style = "Table Grid"
+
+        hdr = table.rows[0].cells
+        hdr[0].text = "Strand"
+        hdr[1].text = "Teacher rating"
+        hdr[2].text = "Domain reflection"
+
+        domain_reflection = safe_text(latest_record.get(f"{domain} Reflection", ""))
+
+        first_row = True
+        for code, label in items:
+            cells = table.add_row().cells
+            cells[0].text = f"{code} {label}"
+            cells[1].text = safe_text(latest_record.get(f"{code} {label}", ""))
+            cells[2].text = domain_reflection if first_row else ""
+            first_row = False
+
+        doc.add_paragraph("")
+
+
+def generate_teacher_docx(teacher_name, latest_df):
+    """
+    Uses the uploaded DOCX template as the base and appends the teacher's
+    actual submission data in a clean summary section.
+    """
+    template_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "Teacher Growth Rubric Final Teacher Self Assessment.docx"
+    )
+
+    latest_record = latest_df.iloc[0].to_dict()
+
+    date_str = safe_text(
+        latest_record.get("Last Edited On")
+        or latest_record.get("Timestamp")
+        or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    )
+
+    doc = Document(template_path)
+
+    replace_name_and_date_in_template(doc, teacher_name, date_str)
+    add_summary_section_to_doc(doc, latest_record)
+
+    out = BytesIO()
+    doc.save(out)
+    out.seek(0)
+    return out
 
 # =========================
 # UI CONFIG (must be first)
