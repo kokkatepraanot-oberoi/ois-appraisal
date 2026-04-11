@@ -100,7 +100,9 @@ def add_summary_section_to_doc(doc, latest_record):
         domain_reflection = safe_text(latest_record.get(f"{domain} Reflection", ""))
 
         for code, label in items:
-            strand_para = doc.add_paragraph(style="List Bullet")
+            strand_para = doc.add_paragraph()
+            strand_para.style = doc.styles["Normal"]
+            strand_para.add_run("• ").bold = True
             strand_para.add_run(f"{code} {label}: ").bold = True
             strand_para.add_run(safe_text(latest_record.get(f"{code} {label}", "")))
 
