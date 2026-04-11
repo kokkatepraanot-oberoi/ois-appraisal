@@ -1080,97 +1080,30 @@ if tab == "Admin" and i_am_admin:
                     use_container_width=True
                 )
                 
-                # 📄 PDF Generation Section
                 
-                from datetime import datetime
-                from pypdf import PdfReader, PdfWriter
-                from reportlab.pdfgen import canvas
-                from reportlab.lib.pagesizes import letter
-                from reportlab.lib.utils import ImageReader
-                import matplotlib.pyplot as plt
-                import os
-
+                # ✅ CSV + DOCX Download Buttons
                 csv = rows.to_csv(index=False).encode("utf-8")
-                
-                def generate_teacher_pdf(teacher_name, latest_df):
-                    """Overlay teacher name/date on rubric and attach visual grid summary."""
-                    rubric_path = os.path.join(
-                        os.path.dirname(os.path.dirname(__file__)),
-                        "Teacher Growth Rubric 2025-2026; Kim Marshall’s Teacher Evaluation.pdf"
-                    )
-                    reader = PdfReader(rubric_path)
-                    writer = PdfWriter()
-                
-                    # 🟢 Overlay teacher name + date on first page
-                    overlay = BytesIO()
-                    c = canvas.Canvas(overlay, pagesize=letter)
-                    c.setFont("Helvetica-Bold", 12)
-                    c.drawString(80, 750, f"Name: {teacher_name}")
-                    c.drawString(380, 750, f"Date: {datetime.now().strftime('%d %b %Y')}")
-                    c.save()
-                    overlay.seek(0)
-                    overlay_pdf = PdfReader(overlay)
-                
-                    first_page = reader.pages[0]
-                    first_page.merge_page(overlay_pdf.pages[0])
-                    writer.add_page(first_page)
-                
-                    # Copy rest of rubric pages
-                    for page in reader.pages[1:]:
-                        writer.add_page(page)
-                
-                    # 🟦 Create a visual grid from DataFrame
-                    plt.figure(figsize=(10, len(latest_df.columns) * 0.3))
-                    plt.axis('off')
-                    table = plt.table(
-                        cellText=latest_df.values,
-                        colLabels=latest_df.columns,
-                        loc='center',
-                        cellLoc='center'
-                    )
-                    table.auto_set_font_size(False)
-                    table.set_fontsize(6)
-                    plt.tight_layout()
-                
-                    img_buf = BytesIO()
-                    plt.savefig(img_buf, format="png", bbox_inches='tight', dpi=300)
-                    plt.close()
-                    img_buf.seek(0)
-                
-                    # 🖼️ Add the DataFrame image as a page
-                    grid_page = BytesIO()
-                    c = canvas.Canvas(grid_page, pagesize=letter)
-                    img = ImageReader(img_buf)
-                    c.drawImage(img, 40, 120, width=520, height=600, preserveAspectRatio=True)
-                    c.setFont("Helvetica-Bold", 14)
-                    c.drawString(200, 740, "Teacher Self-Assessment Grid Summary")
-                    c.save()
-                    grid_page.seek(0)
-                    writer.append(PdfReader(grid_page))
-                
-                    # Return the merged PDF
-                    out = BytesIO()
-                    writer.write(out)
-                    out.seek(0)
-                    return out
 
-                
-                
-                # ✅ CSV + PDF Download Buttons
                 st.download_button(
-                    f"⬇️ Download all submissions for {teacher_choice}",
+                    f"⬇️ Download all submissions for {teacher_choice} (CSV)",
                     data=csv,
                     file_name=f"{teacher_choice}_submissions.csv",
                     mime="text/csv"
                 )
-                
-                pdf_buffer = generate_teacher_pdf(teacher_choice, latest)
+
+                # Use the original latest submission with full rating text, not the HE/E/IN/DNMS version
+                latest_export = rows.sort_values("Timestamp", ascending=False).head(1).copy()
+
+                docx_buffer = generate_teacher_docx(teacher_choice, latest_export)
+
                 st.download_button(
-                    f"📄 Download {teacher_choice}'s Rubric PDF (WIP!!!)",
-                    data=pdf_buffer,
-                    file_name=f"{teacher_choice}_rubric_{datetime.now().strftime('%Y%m%d')}.pdf",
-                    mime="application/pdf"
+                    f"📄 Download {teacher_choice}'s Self-Assessment (DOCX)",
+                    data=docx_buffer,
+                    file_name=f"{teacher_choice}_self_assessment_{datetime.now().strftime('%Y%m%d')}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
+                
+                
 
 
 
