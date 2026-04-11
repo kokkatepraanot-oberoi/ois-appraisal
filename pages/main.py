@@ -70,43 +70,46 @@ def add_summary_section_to_doc(doc, latest_record):
     """
     Appends a clean, appraiser-friendly summary of the teacher's submitted ratings
     and reflections to the end of the template document.
+    Avoids add_table() because some DOCX templates have section margin metadata
+    that causes python-docx to fail when inserting tables.
     """
     doc.add_page_break()
     doc.add_heading("Teacher Self-Assessment Submission Summary", level=1)
 
-    meta = doc.add_paragraph()
-    meta.add_run("Teacher: ").bold = True
-    meta.add_run(safe_text(latest_record.get("Name", "")))
-    meta.add_run("\nAppraiser: ").bold = True
-    meta.add_run(safe_text(latest_record.get("Appraiser", "")))
-    meta.add_run("\nSubmitted on: ").bold = True
-    meta.add_run(safe_text(latest_record.get("Timestamp", "")))
-    meta.add_run("\nLast edited on: ").bold = True
-    meta.add_run(safe_text(latest_record.get("Last Edited On", "")))
+    p = doc.add_paragraph()
+    p.add_run("Teacher: ").bold = True
+    p.add_run(safe_text(latest_record.get("Name", "")))
+
+    p = doc.add_paragraph()
+    p.add_run("Appraiser: ").bold = True
+    p.add_run(safe_text(latest_record.get("Appraiser", "")))
+
+    p = doc.add_paragraph()
+    p.add_run("Submitted on: ").bold = True
+    p.add_run(safe_text(latest_record.get("Timestamp", "")))
+
+    p = doc.add_paragraph()
+    p.add_run("Last edited on: ").bold = True
+    p.add_run(safe_text(latest_record.get("Last Edited On", "")))
+
+    doc.add_paragraph("")
 
     for domain, items in DOMAINS.items():
         doc.add_heading(domain, level=2)
 
-        table = doc.add_table(rows=1, cols=3)
-        table.style = "Table Grid"
-
-        hdr = table.rows[0].cells
-        hdr[0].text = "Strand"
-        hdr[1].text = "Teacher rating"
-        hdr[2].text = "Domain reflection"
-
         domain_reflection = safe_text(latest_record.get(f"{domain} Reflection", ""))
 
-        first_row = True
         for code, label in items:
-            cells = table.add_row().cells
-            cells[0].text = f"{code} {label}"
-            cells[1].text = safe_text(latest_record.get(f"{code} {label}", ""))
-            cells[2].text = domain_reflection if first_row else ""
-            first_row = False
+            strand_para = doc.add_paragraph(style="List Bullet")
+            strand_para.add_run(f"{code} {label}: ").bold = True
+            strand_para.add_run(safe_text(latest_record.get(f"{code} {label}", "")))
+
+        if domain_reflection:
+            refl = doc.add_paragraph()
+            refl.add_run("Self-Reflection: ").bold = True
+            refl.add_run(domain_reflection)
 
         doc.add_paragraph("")
-
 
 def generate_teacher_docx(teacher_name, latest_df):
     """
