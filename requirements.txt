@@ -8,3 +8,4 @@ PyJWT
 pypdf
 reportlab
 matplotlib
+python-docx
