@@ -298,6 +298,84 @@ def build_teacher_initial_final(email):
 
     comparison_df = pd.DataFrame(comparison_rows)
     return latest_initial, latest_final, comparison_df
+
+def render_comparison_html(df):
+    if df.empty:
+        return "<p>No comparison data available.</p>"
+
+    rating_bg = {
+        "HE": "#a8e6a1",
+        "E": "#d0f0fd",
+        "IN": "#fff3b0",
+        "DNMS": "#f8a5a5",
+    }
+
+    trend_bg = {
+        "↑ Improved": "#d9f2d9",
+        "↓ Dropped": "#f8d7da",
+        "→ No change": "#eef2f7",
+        "": "#ffffff",
+    }
+
+    html = """
+    <div style="overflow-x:auto;">
+      <table style="
+          border-collapse: collapse;
+          width: 100%;
+          table-layout: fixed;
+          font-family: Arial, sans-serif;
+          font-size: 13px;
+      ">
+        <thead>
+          <tr style="background-color:#f5f6f7;">
+            <th style="border:1px solid #ddd; padding:8px; width:7%; text-align:left;">Domain</th>
+            <th style="border:1px solid #ddd; padding:8px; width:14%; text-align:left;">Strand</th>
+            <th style="border:1px solid #ddd; padding:8px; width:49%; text-align:left;">Explanation</th>
+            <th style="border:1px solid #ddd; padding:8px; width:8%; text-align:center;">Initial</th>
+            <th style="border:1px solid #ddd; padding:8px; width:8%; text-align:center;">Final</th>
+            <th style="border:1px solid #ddd; padding:8px; width:14%; text-align:center;">Trend</th>
+          </tr>
+        </thead>
+        <tbody>
+    """
+
+    for _, row in df.iterrows():
+        initial = safe_text(row.get("Initial", ""))
+        final = safe_text(row.get("Final", ""))
+        trend = safe_text(row.get("Trend", ""))
+
+        initial_bg = rating_bg.get(initial, "#ffffff")
+        final_bg = rating_bg.get(final, "#ffffff")
+        trend_bg_color = trend_bg.get(trend, "#ffffff")
+
+        explanation = safe_text(row.get("Explanation", ""))
+        explanation_html = explanation.replace("\n", "<br>")
+
+        html += f"""
+          <tr>
+            <td style="border:1px solid #ddd; padding:8px; vertical-align:top;">{safe_text(row.get("Domain", ""))}</td>
+            <td style="border:1px solid #ddd; padding:8px; vertical-align:top;">{safe_text(row.get("Strand", ""))}</td>
+            <td style="
+                border:1px solid #ddd;
+                padding:8px;
+                vertical-align:top;
+                white-space:normal;
+                word-wrap:break-word;
+                overflow-wrap:break-word;
+                line-height:1.4;
+            ">{explanation_html}</td>
+            <td style="border:1px solid #ddd; padding:8px; text-align:center; background:{initial_bg}; font-weight:bold;">{initial}</td>
+            <td style="border:1px solid #ddd; padding:8px; text-align:center; background:{final_bg}; font-weight:bold;">{final}</td>
+            <td style="border:1px solid #ddd; padding:8px; text-align:center; background:{trend_bg_color}; font-weight:bold;">{trend}</td>
+          </tr>
+        """
+
+    html += """
+        </tbody>
+      </table>
+    </div>
+    """
+    return html
     
 # =========================
 # UI CONFIG (must be first)
@@ -1017,17 +1095,10 @@ if tab == "My Submission":
         st.markdown("### Initial vs Final Comparison")
 
         if not comparison_df.empty:
+           import streamlit.components.v1 as components
+
            comparison_display = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
-       
-           styled_comparison = comparison_display.style.map(
-               highlight_ratings,
-               subset=["Initial", "Final"]
-           ).map(
-               trend_style,
-               subset=["Trend"]
-           )
-       
-           st.dataframe(styled_comparison, use_container_width=True, hide_index=True)
+           components.html(render_comparison_html(comparison_display), height=900, scrolling=True)
 
         # Optional CSV downloads
         if latest_initial is not None and not latest_initial.empty:
@@ -1212,17 +1283,10 @@ if tab == "Admin" and i_am_admin:
                     st.warning("No Final submission found.")
         
             if not comparison_df.empty:
-                display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
+                import streamlit.components.v1 as components
 
-                styled_display = display_df.style.map(
-                    highlight_ratings,
-                    subset=["Initial", "Final"]
-                ).map(
-                    trend_style,
-                    subset=["Trend"]
-                )
-                
-                st.dataframe(styled_display, use_container_width=True, hide_index=True)
+                display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
+                components.html(render_comparison_html(display_df), height=900, scrolling=True)
         
                 csv = display_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
