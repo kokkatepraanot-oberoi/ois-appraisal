@@ -1246,11 +1246,11 @@ if tab == "Admin" and i_am_admin:
         col1, col2 = st.columns([1,2])
         with col1:
             st.markdown(
-                f"**Progress:** {submitted_count}/{total_count} submitted  "
-                f"({round((submitted_count/total_count)*100,1)}%)"
+                f"**Final Progress:** {final_submitted_count}/{total_count} submitted  "
+                f"({round((final_submitted_count/total_count)*100,1) if total_count else 0}%)"
             )
         with col2:
-            st.progress(submitted_count / total_count if total_count else 0)
+            st.progress(final_submitted_count / total_count if total_count else 0)
 
         st.dataframe(summary_df, use_container_width=True)
 
