@@ -44,6 +44,79 @@ def safe_text(value):
     except Exception:
         pass
     return str(value)
+ 
+def rating_rank(value):
+    order = {
+        "Does Not Meet Standards": 1,
+        "Improvement Necessary": 2,
+        "Effective": 3,
+        "Highly Effective": 4,
+        "DNMS": 1,
+        "IN": 2,
+        "E": 3,
+        "HE": 4,
+    }
+    return order.get(safe_text(value), 0)
+
+def build_initial_final_comparison(rows_df):
+    """
+    Returns:
+      - latest_initial
+      - latest_final
+      - comparison_df (vertical, good for appraisers)
+    """
+    if rows_df.empty:
+        return None, None, pd.DataFrame()
+
+    working = rows_df.copy()
+
+    if "Assessment Cycle" not in working.columns:
+        working["Assessment Cycle"] = "Initial"
+    else:
+        working["Assessment Cycle"] = working["Assessment Cycle"].replace("", "Initial")
+
+    initial_rows = working[working["Assessment Cycle"] == "Initial"]
+    final_rows = working[working["Assessment Cycle"] == "Final"]
+
+    latest_initial = (
+        initial_rows.sort_values("Timestamp", ascending=False).head(1)
+        if not initial_rows.empty else None
+    )
+    latest_final = (
+        final_rows.sort_values("Timestamp", ascending=False).head(1)
+        if not final_rows.empty else None
+    )
+
+    comparison_rows = []
+
+    for domain, items in DOMAINS.items():
+        for code, label in items:
+            strand = f"{code} {label}"
+
+            init_val = ""
+            final_val = ""
+
+            if latest_initial is not None and not latest_initial.empty:
+                init_val = safe_text(latest_initial.iloc[0].get(strand, ""))
+
+            if latest_final is not None and not latest_final.empty:
+                final_val = safe_text(latest_final.iloc[0].get(strand, ""))
+
+            changed = "Yes" if init_val != final_val else "No"
+
+            comparison_rows.append({
+                "Domain": domain,
+                "Strand": strand,
+                "Initial": init_val,
+                "Final": final_val,
+                "Changed": changed,
+                "Initial Score": rating_rank(init_val),
+                "Final Score": rating_rank(final_val),
+                "Delta": rating_rank(final_val) - rating_rank(init_val) if init_val and final_val else ""
+            })
+
+    comparison_df = pd.DataFrame(comparison_rows)
+    return latest_initial, latest_final, comparison_df
 
 def rating_to_descriptor_key(rating_text):
     mapping = {
@@ -156,6 +229,7 @@ def _rerun():
 SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 ENABLE_REFLECTIONS = True  # set False to hide reflection boxes
+CURRENT_ASSESSMENT_CYCLE = "Final"   # "Initial" or "Final"
 
 # Optional: list of admin emails (lowercase) in .streamlit/secrets.toml
 ADMINS_FROM_SECRETS = set([e.strip().lower() for e in st.secrets.get("admins", [])])
@@ -336,7 +410,7 @@ def load_draft(email):
 # HEADER MANAGEMENT (safe, non-destructive)
 # =========================
 def expected_headers():
-    headers = ["Timestamp", "Email", "Name", "Appraiser"]
+    headers = ["Timestamp", "Email", "Name", "Appraiser", "Assessment Cycle"]
     for domain, items in DOMAINS.items():
         for code, label in items:
             headers.append(f"{code} {label}")
@@ -445,22 +519,40 @@ users_df = load_users_once_df()
 # RESPONSES cache (for 'My submission' and Admin)
 # =========================
 @st.cache_data(ttl=180)  # slightly longer to reduce bursts
+@st.cache_data(ttl=180)
 def load_responses_df():
     vals = with_backoff(RESP_WS.get_all_values)
     if not vals:
         return pd.DataFrame()
+
     header, rows = vals[0], vals[1:]
     df = pd.DataFrame(rows, columns=header) if rows else pd.DataFrame(columns=header)
-    # normalize
+
     if "Email" in df.columns:
         df["Email"] = df["Email"].astype(str).str.lower()
+
+    # Backfill older records that were submitted before Assessment Cycle existed
+    if "Assessment Cycle" not in df.columns:
+        df["Assessment Cycle"] = "Initial"
+    else:
+        df["Assessment Cycle"] = df["Assessment Cycle"].replace("", "Initial")
+
     return df
 
-def user_has_submission(email: str) -> bool:
+def user_has_submission(email: str, cycle: str | None = None) -> bool:
     if not email:
         return False
+
     df = load_responses_df()
-    return (not df.empty) and ("Email" in df.columns) and (not df[df["Email"] == email.strip().lower()].empty)
+    if df.empty or "Email" not in df.columns:
+        return False
+
+    filtered = df[df["Email"] == email.strip().lower()]
+
+    if cycle is not None and "Assessment Cycle" in df.columns:
+        filtered = filtered[filtered["Assessment Cycle"] == cycle]
+
+    return not filtered.empty
 
 # =========================
 # Authentication & Roles
@@ -551,7 +643,10 @@ if not st.session_state.auth_email:
     st.info("Please log in from the sidebar to continue.")
     st.stop()
 
-already_submitted = user_has_submission(st.session_state.auth_email)
+already_submitted = user_has_submission(
+    st.session_state.auth_email,
+    cycle=CURRENT_ASSESSMENT_CYCLE
+)
 
 # Look up my role (and campus, if configured) from the Users table
 me_row = users_df[users_df["Email"] == st.session_state.auth_email]
@@ -690,6 +785,7 @@ if tab == "Self-Assessment":
                 st.session_state.auth_email,
                 st.session_state.auth_name,
                 appraiser,
+                CURRENT_ASSESSMENT_CYCLE,
             ]
             for domain, items in DOMAINS.items():
                 for code, label in items:
@@ -979,7 +1075,43 @@ if tab == "Admin" and i_am_admin:
         if teacher_choice:
             teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
             rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
+
+            # =========================
+            # Initial vs Final Comparison (NEW)
+            # =========================
+            latest_initial, latest_final, comparison_df = build_initial_final_comparison(rows)
         
+            st.subheader(f"Initial vs Final Comparison for {teacher_choice}")
+        
+            col1, col2 = st.columns(2)
+        
+            with col1:
+                if latest_initial is not None and not latest_initial.empty:
+                    st.info(f"Initial submitted: {safe_text(latest_initial.iloc[0].get('Timestamp', ''))}")
+                else:
+                    st.warning("No Initial submission found.")
+        
+            with col2:
+                if latest_final is not None and not latest_final.empty:
+                    st.info(f"Final submitted: {safe_text(latest_final.iloc[0].get('Timestamp', ''))}")
+                else:
+                    st.warning("No Final submission found.")
+        
+            if not comparison_df.empty:
+                display_df = comparison_df[["Domain", "Strand", "Initial", "Final", "Changed", "Delta"]].copy()
+        
+                st.dataframe(display_df, use_container_width=True, hide_index=True)
+        
+                csv = display_df.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    f"⬇️ Download Comparison for {teacher_choice}",
+                    data=csv,
+                    file_name=f"{teacher_choice}_comparison.csv",
+                    mime="text/csv"
+                )
+        
+            st.divider()
+                    
             if rows.empty:
                 st.warning(f"No submission found for {teacher_choice}.")
             else:
