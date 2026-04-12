@@ -1528,6 +1528,105 @@ if tab == "Super Admin" and i_am_sadmin:
         mime="text/csv"
     )
 
+    st.divider()
+    st.subheader("🔎 View Individual Teacher Submissions")
+
+    teacher_choice = st.selectbox(
+        "Select a teacher",
+        assigned["Name"].tolist(),
+        key="sadmin_teacher_choice"
+    )
+
+    if teacher_choice:
+        teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
+        rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
+
+        latest_initial, latest_final, comparison_df = build_initial_final_comparison(rows)
+
+        st.subheader(f"Initial vs Final Comparison for {teacher_choice}")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if latest_initial is not None and not latest_initial.empty:
+                st.info(f"Initial submitted: {safe_text(latest_initial.iloc[0].get('Timestamp', ''))}")
+            else:
+                st.warning("No Initial submission found.")
+
+        with col2:
+            if latest_final is not None and not latest_final.empty:
+                st.info(f"Final submitted: {safe_text(latest_final.iloc[0].get('Timestamp', ''))}")
+            else:
+                st.warning("No Final submission found.")
+
+        if not comparison_df.empty:
+            import streamlit.components.v1 as components
+
+            display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
+            components.html(render_comparison_html(display_df), height=900, scrolling=True)
+
+            csv = display_df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                f"⬇️ Download Comparison for {teacher_choice}",
+                data=csv,
+                file_name=f"{teacher_choice}_comparison.csv",
+                mime="text/csv",
+                key="sadmin_comparison_csv"
+            )
+
+        st.divider()
+
+        if rows.empty:
+            st.warning(f"No submission found for {teacher_choice}.")
+        else:
+            st.subheader(f"Latest submission for {teacher_choice}")
+
+            latest = rows.sort_values("Timestamp", ascending=False).head(1)
+
+            mapping = {
+                "Highly Effective": "HE",
+                "Effective": "E",
+                "Improvement Necessary": "IN",
+                "Does Not Meet Standards": "DNMS"
+            }
+            latest_display = latest.replace(mapping)
+
+            rubric_cols = [col for col in latest_display.columns if re.match(r'^[A-F][0-9]', col)]
+
+            st.dataframe(
+                latest_display[["Timestamp", "Email", "Name", "Appraiser", "Assessment Cycle"] + rubric_cols].style.map(
+                    highlight_ratings,
+                    subset=rubric_cols
+                ),
+                use_container_width=True
+            )
+
+            csv = rows.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                f"⬇️ Download all submissions for {teacher_choice} (CSV)",
+                data=csv,
+                file_name=f"{teacher_choice}_submissions.csv",
+                mime="text/csv",
+                key="sadmin_teacher_csv"
+            )
+
+            latest_export = rows.sort_values("Timestamp", ascending=False).head(1).copy()
+
+            try:
+                docx_buffer = generate_teacher_docx(teacher_choice, latest_export)
+
+                st.download_button(
+                    f"📄 Download {teacher_choice}'s Self-Assessment (DOCX)",
+                    data=docx_buffer,
+                    file_name=f"{teacher_choice}_self_assessment_{datetime.now().strftime('%Y%m%d')}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key="sadmin_teacher_docx"
+                )
+            except Exception as e:
+                st.error(f"Could not generate DOCX for {teacher_choice}: {e}")
+
+        st.divider()
+
 # =========================
 # Super Admin: Whole-School Submissions
 # =========================
