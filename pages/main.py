@@ -455,16 +455,16 @@ def build_printable_comparison_html(teacher_name, teacher_email, appraiser, late
     """
     return html
 
-def make_print_link_button(html_string, label="🖨️ Print Comparison"):
+def make_print_link_button(html_string, label="🖨️ Print Comparison", element_id="print_payload"):
     import html
     safe_payload = html.escape(html_string)
 
     return f"""
     <div style="margin: 8px 0 16px 0;">
-        <textarea id="print_payload" style="display:none;">{safe_payload}</textarea>
+        <textarea id="{element_id}" style="display:none;">{safe_payload}</textarea>
         <button
             onclick="
-                const raw = document.getElementById('print_payload').value;
+                const raw = document.getElementById('{element_id}').value;
                 const win = window.open('', '_blank');
                 win.document.open();
                 win.document.write(raw);
@@ -1692,7 +1692,11 @@ if tab == "Super Admin" and i_am_sadmin:
             )
 
             st.markdown(
-                make_print_link_button(printable_html, label="🖨️ Print Comparison"),
+                make_print_link_button(
+                    printable_html,
+                    label="🖨️ Print Comparison",
+                    element_id=f"print_admin_{teacher_email.replace('@', '_').replace('.', '_')}"
+                ),
                 unsafe_allow_html=True
             )
             
