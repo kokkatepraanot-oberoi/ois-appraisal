@@ -1460,43 +1460,64 @@ if tab == "Super Admin" and i_am_sadmin:
     resp_df = load_responses_df()
     summary_rows = []
 
-    submitted_count = 0
+    initial_submitted_count = 0
+    final_submitted_count = 0
     total_count = len(assigned)
-
+    
     for _, teacher in assigned.iterrows():
         teacher_email = teacher["Email"].strip().lower()
         teacher_name = teacher["Name"]
-
+    
         submissions = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
-        if submissions.empty:
-            status = "❌ Not Submitted"
-            last_date = "-"
-        else:
-            status = "✅ Submitted"
-            last_date = submissions["Timestamp"].max()
-            submitted_count += 1
-
+    
+        if not submissions.empty:
+            if "Assessment Cycle" not in submissions.columns:
+                submissions = submissions.copy()
+                submissions["Assessment Cycle"] = "Initial"
+            else:
+                submissions = submissions.copy()
+                submissions["Assessment Cycle"] = submissions["Assessment Cycle"].replace("", "Initial")
+    
+        initial_subs = submissions[submissions["Assessment Cycle"] == "Initial"] if not submissions.empty else pd.DataFrame()
+        final_subs = submissions[submissions["Assessment Cycle"] == "Final"] if not submissions.empty else pd.DataFrame()
+    
+        initial_status = "✅ Submitted" if not initial_subs.empty else "❌ Not Submitted"
+        final_status = "✅ Submitted" if not final_subs.empty else "❌ Not Submitted"
+    
+        last_initial_date = initial_subs["Timestamp"].max() if not initial_subs.empty else "-"
+        last_final_date = final_subs["Timestamp"].max() if not final_subs.empty else "-"
+    
+        if not initial_subs.empty:
+            initial_submitted_count += 1
+        if not final_subs.empty:
+            final_submitted_count += 1
+    
         summary_rows.append({
             "Teacher": teacher_name,
             "Email": teacher_email,
-            "Status": status,
-            "Last Submission": last_date,
+            "Initial Status": initial_status,
+            "Final Status": final_status,
+            "Last Initial": last_initial_date,
+            "Last Final": last_final_date,
         })
-
+    
     summary_df = pd.DataFrame(summary_rows)
-
-    # Compact progress display
-    col1, col2 = st.columns([1,2])
-    with col1:
-        st.markdown(
-            f"**Progress:** {submitted_count}/{total_count} submitted  "
-            f"({round((submitted_count/total_count)*100,1)}%)"
-        )
-    with col2:
-        st.progress(submitted_count / total_count if total_count else 0)
-
+    
+    st.markdown(
+        f"**Initial:** {initial_submitted_count}/{total_count} submitted "
+        f"({round((initial_submitted_count/total_count)*100, 1) if total_count else 0}%)"
+    )
+    st.progress(initial_submitted_count / total_count if total_count else 0)
+    
+    st.markdown(
+        f"**Final:** {final_submitted_count}/{total_count} submitted "
+        f"({round((final_submitted_count/total_count)*100, 1) if total_count else 0}%)"
+    )
+    st.progress(final_submitted_count / total_count if total_count else 0)
+    
     st.subheader("📋 Summary of All Teachers")
     st.dataframe(summary_df, use_container_width=True)
+    
 
     # Optional: download summary
     csv = summary_df.to_csv(index=False).encode("utf-8")
