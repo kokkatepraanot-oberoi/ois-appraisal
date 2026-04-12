@@ -1100,16 +1100,7 @@ if tab == "Admin" and i_am_admin:
                 }
                 df = df.replace(mapping)
         
-                # Apply same colors as Super Admin
-                def highlight_ratings(val):
-                    colors = {
-                        "HE": "background-color: #a8e6a1;",   # green
-                        "E": "background-color: #d0f0fd;",    # blue
-                        "IN": "background-color: #fff3b0;",   # yellow
-                        "DNMS": "background-color: #f8a5a5;"  # red
-                    }
-                    return colors.get(val, "")
-        
+                       
                 styled_df = df.style.map(highlight_ratings, subset=df.columns[4:])
                 st.dataframe(styled_df, use_container_width=True)
                 
@@ -1183,16 +1174,7 @@ if tab == "Admin" and i_am_admin:
                 }
                 latest = latest.replace(mapping)
         
-                # Apply color coding
-                def highlight_ratings(val):
-                    colors = {
-                        "HE": "background-color: #a8e6a1;",   # green
-                        "E": "background-color: #d0f0fd;",    # blue
-                        "IN": "background-color: #fff3b0;",   # yellow
-                        "DNMS": "background-color: #f8a5a5;"  # red
-                    }
-                    return colors.get(val, "")
-        
+                      
                 styled_latest = latest.style.map(highlight_ratings, subset=latest.columns[4:])
         
                 # =========================
@@ -1404,15 +1386,7 @@ if tab == "Super Admin" and i_am_sadmin:
             }
             df = df.replace(mapping)
 
-            # Apply colors
-            def highlight_ratings(val):
-                colors = {
-                    "HE": "background-color: #a8e6a1;",   # green
-                    "E": "background-color: #d0f0fd;",    # blue
-                    "IN": "background-color: #fff3b0;",   # yellow
-                    "DNMS": "background-color: #f8a5a5;"  # red
-                }
-                return colors.get(val, "")
+            
 
             styled_df = df.style.map(highlight_ratings, subset=df.columns[4:])
 
