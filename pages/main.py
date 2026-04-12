@@ -4,7 +4,6 @@ import time
 import os
 from io import BytesIO
 from datetime import datetime
-import base64
 
 import streamlit as st
 import gspread
@@ -457,15 +456,26 @@ def build_printable_comparison_html(teacher_name, teacher_email, appraiser, late
     return html
 
 def make_print_link_button(html_string, label="🖨️ Print Comparison"):
-    b64 = base64.b64encode(html_string.encode("utf-8")).decode("utf-8")
-    href = f"data:text/html;base64,{b64}"
-    return f'''
-        <a href="{href}" target="_blank" style="text-decoration:none;">
-            <button style="padding:10px 16px; font-size:14px; cursor:pointer;">
-                {label}
-            </button>
-        </a>
-    '''
+    safe_html = (
+        html_string
+        .replace("\\", "\\\\")
+        .replace("`", "\\`")
+        .replace("${", "\\${")
+    )
+
+    return f"""
+    <button
+        onclick="
+            const html = `{safe_html}`;
+            const blob = new Blob([html], {{ type: 'text/html' }});
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        "
+        style="padding:10px 16px; font-size:14px; cursor:pointer;"
+    >
+        {label}
+    </button>
+    """
 # =========================
 # UI CONFIG (must be first)
 # =========================
