@@ -455,27 +455,7 @@ def build_printable_comparison_html(teacher_name, teacher_email, appraiser, late
     """
     return html
 
-def make_print_link_button(html_string, label="🖨️ Print Comparison", element_id="print_payload"):
-    import html
-    safe_payload = html.escape(html_string)
 
-    return f"""
-    <div style="margin: 8px 0 16px 0;">
-        <textarea id="{element_id}" style="display:none;">{safe_payload}</textarea>
-        <button
-            onclick="
-                const raw = document.getElementById('{element_id}').value;
-                const win = window.open('', '_blank');
-                win.document.open();
-                win.document.write(raw);
-                win.document.close();
-            "
-            style="padding:10px 16px; font-size:14px; cursor:pointer;"
-        >
-            {label}
-        </button>
-    </div>
-    """
 # =========================
 # UI CONFIG (must be first)
 # =========================
@@ -1422,11 +1402,7 @@ if tab == "Admin" and i_am_admin:
                 display_df=display_df
                 )
     
-                st.markdown(
-                    make_print_link_button(printable_html, label="🖨️ Print Comparison"),
-                    unsafe_allow_html=True
-                )
-             
+                           
                 csv = display_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
                     f"⬇️ Download Comparison for {teacher_choice}",
@@ -1691,14 +1667,7 @@ if tab == "Super Admin" and i_am_sadmin:
                 display_df=display_df
             )
 
-            st.markdown(
-                make_print_link_button(
-                    printable_html,
-                    label="🖨️ Print Comparison",
-                    element_id=f"print_admin_{teacher_email.replace('@', '_').replace('.', '_')}"
-                ),
-                unsafe_allow_html=True
-            )
+            
             
             csv = display_df.to_csv(index=False).encode("utf-8")
             st.download_button(
