@@ -288,10 +288,12 @@ def build_teacher_initial_final(email):
                 final_val = safe_text(latest_final.iloc[0].get(strand, ""))
 
             comparison_rows.append({
-                "Domain": domain,
+                "Domain": domain.split(":")[0],
                 "Strand": strand,
-                "Initial": init_val,
-                "Final": final_val,
+                "Explanation": DESCRIPTORS.get(strand, {}).get("HE", ""),
+                "Initial": rating_short(init_val),
+                "Final": rating_short(final_val),
+                "Trend": trend_arrow(init_val, final_val),
             })
 
     comparison_df = pd.DataFrame(comparison_rows)
@@ -615,7 +617,6 @@ users_df = load_users_once_df()
 # RESPONSES cache (for 'My submission' and Admin)
 # =========================
 @st.cache_data(ttl=180)  # slightly longer to reduce bursts
-@st.cache_data(ttl=180)
 def load_responses_df():
     vals = with_backoff(RESP_WS.get_all_values)
     if not vals:
@@ -1016,17 +1017,17 @@ if tab == "My Submission":
         st.markdown("### Initial vs Final Comparison")
 
         if not comparison_df.empty:
-            comparison_display = comparison_df.copy()
-
-            styled_comparison = comparison_display.style.map(
-                highlight_ratings,
-                subset=["Initial", "Final"]
-            ).map(
-                trend_style,
-                subset=["Trend"]
-            )
-            
-            st.dataframe(styled_comparison, use_container_width=True, hide_index=True)
+           comparison_display = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
+       
+           styled_comparison = comparison_display.style.map(
+               highlight_ratings,
+               subset=["Initial", "Final"]
+           ).map(
+               trend_style,
+               subset=["Trend"]
+           )
+       
+           st.dataframe(styled_comparison, use_container_width=True, hide_index=True)
 
         # Optional CSV downloads
         if latest_initial is not None and not latest_initial.empty:
