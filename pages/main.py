@@ -16,7 +16,7 @@ from descriptors import DESCRIPTORS
 # =========================
 # Helper: add descriptors as subheaders (inline under column names)
 # =========================
-
+ 
 def add_descriptor_subheaders(df):
     """
     Append short Kim Marshall descriptors under each rubric column header.
@@ -45,36 +45,26 @@ def safe_text(value):
         pass
     return str(value)
 
-
-def replace_name_and_date_in_template(doc, teacher_name, date_str):
-    """
-    Replaces the first Name / Date placeholders in the uploaded DOCX template.
-    """
-    for p in doc.paragraphs:
-        txt = p.text
-        if "Name:" in txt and "Date:" in txt:
-            txt = re.sub(r"Name:\s*_+", f"Name: {teacher_name}", txt)
-            txt = re.sub(r"Date:\s*_+", f"Date: {date_str}", txt)
-            p.text = txt
-            return
-
-    # fallback if not found in same paragraph
-    for p in doc.paragraphs:
-        if "Name:" in p.text:
-            p.text = re.sub(r"Name:\s*_+", f"Name: {teacher_name}", p.text)
-        if "Date:" in p.text:
-            p.text = re.sub(r"Date:\s*_+", f"Date: {date_str}", p.text)
-
-
+def rating_to_descriptor_key(rating_text):
+    mapping = {
+        "Highly Effective": "HE",
+        "Effective": "E",
+        "Improvement Necessary": "IN",
+        "Does Not Meet Standards": "DNMS",
+        "HE": "HE",
+        "E": "E",
+        "IN": "IN",
+        "DNMS": "DNMS",
+    }
+    return mapping.get(safe_text(rating_text), "")
+    
 def add_summary_section_to_doc(doc, latest_record):
     """
-    Appends a clean, appraiser-friendly summary of the teacher's submitted ratings
-    and reflections to the end of the template document.
-    Avoids add_table() because some DOCX templates have section margin metadata
-    that causes python-docx to fail when inserting tables.
+    Creates a clean appraiser-friendly summary only.
+    No rubric pages, no template content.
+    Includes strand code/name, selected rating, and descriptor explanation.
     """
-    doc.add_page_break()
-    doc.add_heading("Teacher Self-Assessment Submission Summary", level=1)
+    doc.add_heading("OIS Teacher Self-Assessment Summary", level=1)
 
     p = doc.add_paragraph()
     p.add_run("Teacher: ").bold = True
@@ -100,47 +90,44 @@ def add_summary_section_to_doc(doc, latest_record):
         domain_reflection = safe_text(latest_record.get(f"{domain} Reflection", ""))
 
         for code, label in items:
-            strand_para = doc.add_paragraph()
-            strand_para.style = doc.styles["Normal"]
-            strand_para.add_run("• ").bold = True
-            strand_para.add_run(f"{code} {label}: ").bold = True
-            strand_para.add_run(safe_text(latest_record.get(f"{code} {label}", "")))
+            strand_key = f"{code} {label}"
+            selected_rating = safe_text(latest_record.get(strand_key, ""))
+            descriptor_key = rating_to_descriptor_key(selected_rating)
+
+            explanation = ""
+            if strand_key in DESCRIPTORS and descriptor_key in DESCRIPTORS[strand_key]:
+                explanation = safe_text(DESCRIPTORS[strand_key][descriptor_key])
+
+            p = doc.add_paragraph()
+            p.add_run(f"{strand_key}\n").bold = True
+            p.add_run("Selected Rating: ").bold = True
+            p.add_run(f"{selected_rating}\n")
+            p.add_run("Explanation: ").bold = True
+            p.add_run(explanation if explanation else "No explanation found.")
 
         if domain_reflection:
-            refl = doc.add_paragraph()
-            refl.add_run("Self-Reflection: ").bold = True
-            refl.add_run(domain_reflection)
+            p = doc.add_paragraph()
+            p.add_run("Domain Reflection: ").bold = True
+            p.add_run(domain_reflection)
 
         doc.add_paragraph("")
 
+
 def generate_teacher_docx(teacher_name, latest_df):
     """
-    Uses the uploaded DOCX template as the base and appends the teacher's
-    actual submission data in a clean summary section.
+    Generates a clean DOCX with summary only.
+    Does not use the rubric template.
     """
-    template_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "Teacher Growth Rubric Final Teacher Self Assessment.docx"
-    )
-
     latest_record = latest_df.iloc[0].to_dict()
 
-    date_str = safe_text(
-        latest_record.get("Last Edited On")
-        or latest_record.get("Timestamp")
-        or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    )
-
-    doc = Document(template_path)
-
-    replace_name_and_date_in_template(doc, teacher_name, date_str)
+    doc = Document()
     add_summary_section_to_doc(doc, latest_record)
 
     out = BytesIO()
     doc.save(out)
     out.seek(0)
     return out
-
+    
 # =========================
 # UI CONFIG (must be first)
 # =========================
