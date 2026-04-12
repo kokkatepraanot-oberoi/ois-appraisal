@@ -4,6 +4,7 @@ import time
 import os
 from io import BytesIO
 from datetime import datetime
+import base64
 
 import streamlit as st
 import gspread
@@ -16,7 +17,8 @@ from descriptors import DESCRIPTORS
 # =========================
 # Helper: add descriptors as subheaders (inline under column names)
 # =========================
- 
+
+
 def add_descriptor_subheaders(df):
     """
     Append short Kim Marshall descriptors under each rubric column header.
@@ -376,7 +378,94 @@ def render_comparison_html(df):
     </div>
     """
     return html
-    
+
+def build_printable_comparison_html(teacher_name, teacher_email, appraiser, latest_initial, latest_final, display_df):
+    initial_date = ""
+    final_date = ""
+
+    if latest_initial is not None and not latest_initial.empty:
+        initial_date = safe_text(latest_initial.iloc[0].get("Timestamp", ""))
+
+    if latest_final is not None and not latest_final.empty:
+        final_date = safe_text(latest_final.iloc[0].get("Timestamp", ""))
+
+    table_html = render_comparison_html(display_df)
+
+    html = f"""
+    <html>
+    <head>
+        <title>{teacher_name} - Initial vs Final Comparison</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 24px;
+                color: #111;
+            }}
+            h1 {{
+                font-size: 24px;
+                margin-bottom: 8px;
+            }}
+            h2 {{
+                font-size: 18px;
+                margin-top: 0;
+                margin-bottom: 20px;
+                color: #444;
+            }}
+            .meta {{
+                margin-bottom: 20px;
+                line-height: 1.6;
+                font-size: 14px;
+            }}
+            .meta strong {{
+                display: inline-block;
+                min-width: 140px;
+            }}
+            .print-btn {{
+                margin-bottom: 20px;
+            }}
+            @media print {{
+                .print-btn {{
+                    display: none;
+                }}
+                body {{
+                    margin: 10mm;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="print-btn">
+            <button onclick="window.print()" style="padding:10px 16px; font-size:14px; cursor:pointer;">
+                Print
+            </button>
+        </div>
+
+        <h1>{teacher_name}</h1>
+        <h2>Initial vs Final Self-Assessment Comparison</h2>
+
+        <div class="meta">
+            <div><strong>Email:</strong> {teacher_email}</div>
+            <div><strong>Appraiser:</strong> {appraiser}</div>
+            <div><strong>Initial Submitted:</strong> {initial_date or "-"}</div>
+            <div><strong>Final Submitted:</strong> {final_date or "-"}</div>
+        </div>
+
+        {table_html}
+    </body>
+    </html>
+    """
+    return html
+
+def make_print_link_button(html_string, label="🖨️ Print Comparison"):
+    b64 = base64.b64encode(html_string.encode("utf-8")).decode("utf-8")
+    href = f"data:text/html;base64,{b64}"
+    return f'''
+        <a href="{href}" target="_blank" style="text-decoration:none;">
+            <button style="padding:10px 16px; font-size:14px; cursor:pointer;">
+                {label}
+            </button>
+        </a>
+    '''
 # =========================
 # UI CONFIG (must be first)
 # =========================
@@ -1311,7 +1400,23 @@ if tab == "Admin" and i_am_admin:
 
                 display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
                 components.html(render_comparison_html(display_df), height=900, scrolling=True)
-        
+
+                appraiser_name = safe_text(rows.sort_values("Timestamp", ascending=False).head(1).iloc[0].get("Appraiser", ""))
+
+                printable_html = build_printable_comparison_html(
+                teacher_name=teacher_choice,
+                teacher_email=teacher_email,
+                appraiser=appraiser_name,
+                latest_initial=latest_initial,
+                latest_final=latest_final,
+                display_df=display_df
+            )
+
+            st.markdown(
+                make_print_link_button(printable_html, label="🖨️ Print Comparison"),
+                unsafe_allow_html=True
+            )
+             
                 csv = display_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
                     f"⬇️ Download Comparison for {teacher_choice}",
@@ -1565,6 +1670,22 @@ if tab == "Super Admin" and i_am_sadmin:
             display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
             components.html(render_comparison_html(display_df), height=900, scrolling=True)
 
+            appraiser_name = safe_text(rows.sort_values("Timestamp", ascending=False).head(1).iloc[0].get("Appraiser", ""))
+
+            printable_html = build_printable_comparison_html(
+                teacher_name=teacher_choice,
+                teacher_email=teacher_email,
+                appraiser=appraiser_name,
+                latest_initial=latest_initial,
+                latest_final=latest_final,
+                display_df=display_df
+            )
+
+            st.markdown(
+                make_print_link_button(printable_html, label="🖨️ Print Comparison"),
+                unsafe_allow_html=True
+            )
+            
             csv = display_df.to_csv(index=False).encode("utf-8")
             st.download_button(
                 f"⬇️ Download Comparison for {teacher_choice}",
