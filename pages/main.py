@@ -456,25 +456,25 @@ def build_printable_comparison_html(teacher_name, teacher_email, appraiser, late
     return html
 
 def make_print_link_button(html_string, label="🖨️ Print Comparison"):
-    safe_html = (
-        html_string
-        .replace("\\", "\\\\")
-        .replace("`", "\\`")
-        .replace("${", "\\${")
-    )
+    import html
+    safe_payload = html.escape(html_string)
 
     return f"""
-    <button
-        onclick="
-            const html = `{safe_html}`;
-            const blob = new Blob([html], {{ type: 'text/html' }});
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
-        "
-        style="padding:10px 16px; font-size:14px; cursor:pointer;"
-    >
-        {label}
-    </button>
+    <div style="margin: 8px 0 16px 0;">
+        <textarea id="print_payload" style="display:none;">{safe_payload}</textarea>
+        <button
+            onclick="
+                const raw = document.getElementById('print_payload').value;
+                const win = window.open('', '_blank');
+                win.document.open();
+                win.document.write(raw);
+                win.document.close();
+            "
+            style="padding:10px 16px; font-size:14px; cursor:pointer;"
+        >
+            {label}
+        </button>
+    </div>
     """
 # =========================
 # UI CONFIG (must be first)
