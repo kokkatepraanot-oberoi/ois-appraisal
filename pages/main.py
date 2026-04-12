@@ -69,7 +69,43 @@ def rating_rank(value):
         "E": 3,
         "HE": 4,
     }
-    return order.get(safe_text(value), 0)
+    return order.get(str(value).strip(), 0)
+
+
+def rating_short(value):
+    mapping = {
+        "Highly Effective": "HE",
+        "Effective": "E",
+        "Improvement Necessary": "IN",
+        "Does Not Meet Standards": "DNMS",
+        "HE": "HE",
+        "E": "E",
+        "IN": "IN",
+        "DNMS": "DNMS",
+    }
+    return mapping.get(str(value).strip(), str(value).strip())
+
+
+def trend_arrow(initial_value, final_value):
+    init_score = rating_rank(initial_value)
+    final_score = rating_rank(final_value)
+
+    if init_score == 0 or final_score == 0:
+        return ""
+    if final_score > init_score:
+        return "↑ Improved"
+    if final_score < init_score:
+        return "↓ Dropped"
+    return "→ No change"
+
+
+def trend_style(val):
+    styles = {
+        "↑ Improved": "background-color: #d9f2d9; color: #1f6f1f; font-weight: bold;",
+        "↓ Dropped": "background-color: #f8d7da; color: #842029; font-weight: bold;",
+        "→ No change": "background-color: #eef2f7; color: #495057;"
+    }
+    return styles.get(val, "")
 
 def build_initial_final_comparison(rows_df):
     """
@@ -118,14 +154,12 @@ def build_initial_final_comparison(rows_df):
             changed = "Yes" if init_val != final_val else "No"
 
             comparison_rows.append({
-                "Domain": domain,
+                "Domain": domain.split(":")[0],   # just A / B / C / D / E / F
                 "Strand": strand,
-                "Initial": init_val,
-                "Final": final_val,
-                "Changed": changed,
-                "Initial Score": rating_rank(init_val),
-                "Final Score": rating_rank(final_val),
-                "Delta": rating_rank(final_val) - rating_rank(init_val) if init_val and final_val else ""
+                "Explanation": DESCRIPTORS.get(strand, {}).get("HE", ""),
+                "Initial": rating_short(init_val),
+                "Final": rating_short(final_val),
+                "Trend": trend_arrow(init_val, final_val),
             })
 
     comparison_df = pd.DataFrame(comparison_rows)
@@ -982,13 +1016,17 @@ if tab == "My Submission":
         st.markdown("### Initial vs Final Comparison")
 
         if not comparison_df.empty:
-            comparison_display = comparison_df.copy().replace({
-                "Highly Effective": "HE",
-                "Effective": "E",
-                "Improvement Necessary": "IN",
-                "Does Not Meet Standards": "DNMS"
-            })
-            st.dataframe(comparison_display, use_container_width=True, hide_index=True)
+            comparison_display = comparison_df.copy()
+
+            styled_comparison = comparison_display.style.map(
+                highlight_ratings,
+                subset=["Initial", "Final"]
+            ).map(
+                trend_style,
+                subset=["Trend"]
+            )
+            
+            st.dataframe(styled_comparison, use_container_width=True, hide_index=True)
 
         # Optional CSV downloads
         if latest_initial is not None and not latest_initial.empty:
@@ -1173,9 +1211,17 @@ if tab == "Admin" and i_am_admin:
                     st.warning("No Final submission found.")
         
             if not comparison_df.empty:
-                display_df = comparison_df[["Domain", "Strand", "Initial", "Final", "Changed", "Delta"]].copy()
-        
-                st.dataframe(display_df, use_container_width=True, hide_index=True)
+                display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
+
+                styled_display = display_df.style.map(
+                    highlight_ratings,
+                    subset=["Initial", "Final"]
+                ).map(
+                    trend_style,
+                    subset=["Trend"]
+                )
+                
+                st.dataframe(styled_display, use_container_width=True, hide_index=True)
         
                 csv = display_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
