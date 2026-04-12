@@ -668,9 +668,9 @@ if st.sidebar.button("🚪 **LOGOUT**", type="primary", use_container_width=True
     st.switch_page("app.py")
 
 # 👇 ADD HERE
-        if role == "user":
-            if st.button("✏️ Edit Initial Submission", use_container_width=True):
-                st.session_state["edit_initial_mode"] = True
+if role == "user":
+    if st.button("✏️ Edit Initial Submission", use_container_width=True):
+        st.session_state["edit_initial_mode"] = True        
 
 # =========================
 # Sidebar: Live progress (no API calls)
