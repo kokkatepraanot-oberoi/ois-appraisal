@@ -44,6 +44,19 @@ def safe_text(value):
     except Exception:
         pass
     return str(value)
+
+def highlight_ratings(val):
+    colors = {
+        "HE": "background-color: #a8e6a1;",   # green
+        "E": "background-color: #d0f0fd;",    # blue
+        "IN": "background-color: #fff3b0;",   # yellow
+        "DNMS": "background-color: #f8a5a5;", # red
+        "Highly Effective": "background-color: #a8e6a1;",
+        "Effective": "background-color: #d0f0fd;",
+        "Improvement Necessary": "background-color: #fff3b0;",
+        "Does Not Meet Standards": "background-color: #f8a5a5;",
+    }
+    return colors.get(val, "")
  
 def rating_rank(value):
     order = {
