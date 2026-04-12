@@ -1410,12 +1410,12 @@ if tab == "Admin" and i_am_admin:
                 latest_initial=latest_initial,
                 latest_final=latest_final,
                 display_df=display_df
-            )
-
-            st.markdown(
-                make_print_link_button(printable_html, label="🖨️ Print Comparison"),
-                unsafe_allow_html=True
-            )
+                )
+    
+                st.markdown(
+                    make_print_link_button(printable_html, label="🖨️ Print Comparison"),
+                    unsafe_allow_html=True
+                )
              
                 csv = display_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
