@@ -200,6 +200,55 @@ def generate_teacher_docx(teacher_name, latest_df):
     doc.save(out)
     out.seek(0)
     return out
+
+def build_teacher_initial_final(email):
+    df = load_responses_df()
+    mine = df[df["Email"] == email.strip().lower()] if not df.empty else pd.DataFrame()
+
+    if mine.empty:
+        return None, None, pd.DataFrame()
+
+    if "Assessment Cycle" not in mine.columns:
+        mine["Assessment Cycle"] = "Initial"
+    else:
+        mine["Assessment Cycle"] = mine["Assessment Cycle"].replace("", "Initial")
+
+    initial_rows = mine[mine["Assessment Cycle"] == "Initial"]
+    final_rows = mine[mine["Assessment Cycle"] == "Final"]
+
+    latest_initial = (
+        initial_rows.sort_values("Timestamp", ascending=False).head(1)
+        if not initial_rows.empty else None
+    )
+    latest_final = (
+        final_rows.sort_values("Timestamp", ascending=False).head(1)
+        if not final_rows.empty else None
+    )
+
+    comparison_rows = []
+
+    for domain, items in DOMAINS.items():
+        for code, label in items:
+            strand = f"{code} {label}"
+
+            init_val = ""
+            final_val = ""
+
+            if latest_initial is not None and not latest_initial.empty:
+                init_val = safe_text(latest_initial.iloc[0].get(strand, ""))
+
+            if latest_final is not None and not latest_final.empty:
+                final_val = safe_text(latest_final.iloc[0].get(strand, ""))
+
+            comparison_rows.append({
+                "Domain": domain,
+                "Strand": strand,
+                "Initial": init_val,
+                "Final": final_val,
+            })
+
+    comparison_df = pd.DataFrame(comparison_rows)
+    return latest_initial, latest_final, comparison_df
     
 # =========================
 # UI CONFIG (must be first)
@@ -618,6 +667,10 @@ if st.sidebar.button("🚪 **LOGOUT**", type="primary", use_container_width=True
     # Force redirect to app.py (login)
     st.switch_page("app.py")
 
+# 👇 ADD HERE
+        if role == "user":
+            if st.button("✏️ Edit Initial Submission", use_container_width=True):
+                st.session_state["edit_initial_mode"] = True
 
 # =========================
 # Sidebar: Live progress (no API calls)
@@ -698,8 +751,35 @@ if tab == "Self-Assessment":
 
         # 🔹 Load draft if exists
         draft_data = load_draft(st.session_state.auth_email) or {}
+        
+        # 🔹 ALWAYS load initial/final (not inside draft condition)
+        latest_initial, latest_final, comparison_df = build_teacher_initial_final(
+            st.session_state.auth_email
+        )
+        
         if draft_data:
             st.info("💾 A saved draft was found and preloaded. You can continue where you left off.")
+        
+        # 🔹 Show initial for Final cycle
+        if CURRENT_ASSESSMENT_CYCLE == "Final" and latest_initial is not None and not latest_initial.empty:
+            st.markdown("### Your Initial Submission")
+        
+            initial_display = latest_initial.copy().replace({
+                "Highly Effective": "HE",
+                "Effective": "E",
+                "Improvement Necessary": "IN",
+                "Does Not Meet Standards": "DNMS"
+            })
+        
+            st.dataframe(
+                initial_display.style.map(
+                    highlight_ratings,
+                    subset=initial_display.columns[5:]
+                ),
+                use_container_width=True
+            )
+        
+            st.info("Use your Initial submission as a reference while completing your Final self-assessment.")
 
         # Selections (direct widgets so sidebar progress updates live)
         selections = {}
@@ -807,132 +887,94 @@ if tab == "Self-Assessment":
 # Page: My Submission (teachers see their data here)
 # =========================
 if tab == "My Submission":
-    df = load_responses_df()
-    my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
-
-    # auto-refresh if cache stale
-    if my.empty:
-        load_responses_df.clear()
-        df = load_responses_df()
-        my = df[df["Email"] == st.session_state.auth_email] if not df.empty and "Email" in df.columns else pd.DataFrame()
-
     st.subheader("My Submission")
 
-    if my.empty:
+    latest_initial, latest_final, comparison_df = build_teacher_initial_final(
+        st.session_state.auth_email
+    )
+
+    if latest_initial is None and latest_final is None:
         st.info("No submission found yet.")
     else:
-        # ✅ Use "my" dataframe instead of teacher_choice/rows
-        st.subheader("Latest submission")
+        top_cols = st.columns(2)
 
-        latest = my.sort_values("Timestamp", ascending=False).head(1)
+        with top_cols[0]:
+            if latest_initial is not None and not latest_initial.empty:
+                st.markdown("### Initial Submission")
+                initial_display = latest_initial.copy().replace({
+                    "Highly Effective": "HE",
+                    "Effective": "E",
+                    "Improvement Necessary": "IN",
+                    "Does Not Meet Standards": "DNMS"
+                })
+                st.dataframe(
+                    initial_display.style.map(
+                        highlight_ratings,
+                        subset=initial_display.columns[5:]
+                    ),
+                    use_container_width=True
+                )
+            else:
+                st.info("No Initial submission yet.")
 
-        # 🔹 Replace full text with acronyms
-        mapping = {
-            "Highly Effective": "HE",
-            "Effective": "E",
-            "Improvement Necessary": "IN",
-            "Does Not Meet Standards": "DNMS"
-        }
-        latest = latest.replace(mapping)
+        with top_cols[1]:
+            if latest_final is not None and not latest_final.empty:
+                st.markdown("### Final Submission")
+                final_display = latest_final.copy().replace({
+                    "Highly Effective": "HE",
+                    "Effective": "E",
+                    "Improvement Necessary": "IN",
+                    "Does Not Meet Standards": "DNMS"
+                })
+                st.dataframe(
+                    final_display.style.map(
+                        highlight_ratings,
+                        subset=final_display.columns[5:]
+                    ),
+                    use_container_width=True
+                )
+            else:
+                st.info("No Final submission yet.")
 
-        # 🔹 Apply same colors
-        def highlight_ratings(val):
-            colors = {
-                "HE": "background-color: #a8e6a1;",   # green
-                "E": "background-color: #d0f0fd;",    # blue
-                "IN": "background-color: #fff3b0;",   # yellow
-                "DNMS": "background-color: #f8a5a5;"  # red
-            }
-            return colors.get(val, "")
+        st.divider()
+        st.markdown("### Initial vs Final Comparison")
 
-        styled_latest = latest.style.map(highlight_ratings, subset=latest.columns[4:])
-        st.dataframe(styled_latest, use_container_width=True)
+        if not comparison_df.empty:
+            comparison_display = comparison_df.copy().replace({
+                "Highly Effective": "HE",
+                "Effective": "E",
+                "Improvement Necessary": "IN",
+                "Does Not Meet Standards": "DNMS"
+            })
+            st.dataframe(comparison_display, use_container_width=True, hide_index=True)
 
-        if not my.empty:
-            latest = my.sort_values("Timestamp", ascending=False).head(1)
-            row_index = latest.index[-1] + 2  # add 2 → header row + 0-based index
-        
-            st.divider()
-            st.subheader("✏️ Edit Your Submission (only in consultation with your appraiser)")
-        
-            with st.form("edit_form"):
-                updated_row = list(latest.iloc[0].values)
-        
-                # Columns that should not be editable
-                lock_cols = ["Timestamp", "Email", "Name", "Appraiser"]
-        
-                for col in latest.columns:
-                    if col in lock_cols:
-                        continue
-                    current_value = latest.iloc[0][col]
-                
-                    # Rubric strand columns (A–F, not reflections)
-                    if any(col.startswith(x) for x in ["A", "B", "C", "D", "E", "F"]) and "Reflection" not in col:
-                        choice = st.selectbox(
-                            col,
-                            ["Highly Effective", "Effective", "Improvement Necessary", "Does Not Meet Standards"],
-                            index=RATINGS.index(current_value) if current_value in RATINGS else 1
-                        )
-                        updated_row[latest.columns.get_loc(col)] = choice
-                
-                        # 🔹 Add descriptors expander under each strand
-                        if col in DESCRIPTORS:
-                            with st.expander("📖 See descriptors for this strand"):
-                                st.markdown(f"""
-                                **Highly Effective (HE):** {DESCRIPTORS[col]['HE']}  
-                
-                                **Effective (E):** {DESCRIPTORS[col]['E']}  
-                
-                                **Improvement Necessary (IN):** {DESCRIPTORS[col]['IN']}  
-                
-                                **Does Not Meet Standards (DNMS):** {DESCRIPTORS[col]['DNMS']}  
-                                """)
-                    else:
-                        # Reflections and free-text
-                        text_val = st.text_area(col, value=current_value or "")
-                        updated_row[latest.columns.get_loc(col)] = text_val
+        # Optional CSV downloads
+        if latest_initial is not None and not latest_initial.empty:
+            init_csv = latest_initial.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "⬇️ Download Initial Submission (CSV)",
+                data=init_csv,
+                file_name="initial_submission.csv",
+                mime="text/csv"
+            )
 
-        
-                submitted = st.form_submit_button("💾 Save changes")
-        
-            if submitted:
-                # Add "Last Edited On" column if missing
-                header = with_backoff(RESP_WS.row_values, 1)
-                if "Last Edited On" not in header:
-                    # Ensure the sheet has enough columns
-                    if RESP_WS.col_count < len(header) + 1:
-                        RESP_WS.add_cols(1)   # add one extra column
-                    
-                    RESP_WS.update_cell(1, len(header) + 1, "Last Edited On")
-                    header.append("Last Edited On")
+        if latest_final is not None and not latest_final.empty:
+            final_csv = latest_final.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "⬇️ Download Final Submission (CSV)",
+                data=final_csv,
+                file_name="final_submission.csv",
+                mime="text/csv"
+            )
 
-        
-                # Ensure updated_row has correct length
-                if len(updated_row) < len(header):
-                    updated_row.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                else:
-                    updated_row[header.index("Last Edited On")] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-                # Overwrite the row in Google Sheet
-                with_backoff(RESP_WS.update, f"A{row_index}:ZZ{row_index}", [updated_row])
-        
-                load_responses_df.clear()
-                st.success("✅ Your submission has been updated successfully!")
-                _rerun()
-        
-        # ✅ All submissions for download (sorted)
-        my_sorted = my.sort_values("Timestamp", ascending=False)
-        csv = my_sorted.to_csv(index=False).encode("utf-8")
+        comparison_csv = comparison_df.to_csv(index=False).encode("utf-8")
         st.download_button(
-            "⬇️ Download my submissions (CSV)",
-            data=csv,
-            file_name="my_self_assessment.csv",
+            "⬇️ Download Initial vs Final Comparison (CSV)",
+            data=comparison_csv,
+            file_name="initial_vs_final_comparison.csv",
             mime="text/csv"
         )
-
-    if st.button("🔄 Refresh"):
-        load_responses_df.clear()
-        _rerun()
+  
 
 
 # =========================
