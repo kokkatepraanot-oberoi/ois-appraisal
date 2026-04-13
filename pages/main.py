@@ -604,11 +604,68 @@ def final_eval_domain_rows():
         ("E Rating", "E. Family and Community Outreach"),
         ("F Rating", "F. Professional Responsibilities"),
     ]
+
+def teacher_started_final_evaluation(teacher_email: str) -> bool:
+    rec = get_teacher_final_eval_record(teacher_email)
+    if not rec:
+        return False
+
+    return any([
+        safe_text(rec.get("Teacher Submitted", "")).strip().lower() == "yes",
+        safe_text(rec.get("Subject Area", "")).strip() != "",
+        safe_text(rec.get("Student Survey Feedback", "")).strip() != "",
+        safe_text(rec.get("Overall Reflection", "")).strip() != "",
+    ])
+
+
+def teacher_can_edit_final_self_assessment(teacher_email: str) -> bool:
+    if not user_has_submission(teacher_email, cycle="Final"):
+        return False
+
+    if teacher_started_final_evaluation(teacher_email):
+        return False
+
+    return True
+
+def domain_letter_from_strand(strand_code: str) -> str:
+    return safe_text(strand_code).split()[0][:1]
+
+def calculate_domain_rating_suggestion(teacher_email: str, domain_letter: str):
+    latest_initial, latest_final, comparison_df = build_teacher_initial_final(teacher_email)
+
+    if comparison_df.empty:
+        return ""
+
+    domain_rows = comparison_df[comparison_df["Domain"] == domain_letter].copy()
+    if domain_rows.empty:
+        return ""
+
+    score_map = {"DNMS": 1, "IN": 2, "E": 3, "HE": 4}
+    reverse_map = {1: "Does Not Meet Standards", 2: "Improvement Necessary", 3: "Effective", 4: "Highly Effective"}
+
+    scores = []
+    for _, row in domain_rows.iterrows():
+        final_val = safe_text(row.get("Final", ""))
+        if final_val in score_map:
+            scores.append(score_map[final_val])
+
+    if not scores:
+        return ""
+
+    avg_score = sum(scores) / len(scores)
+
+    if avg_score >= 3.5:
+        return reverse_map[4]
+    elif avg_score >= 2.5:
+        return reverse_map[3]
+    elif avg_score >= 1.5:
+        return reverse_map[2]
+    return reverse_map[1]
     
 # =========================
 # UI CONFIG (must be first)
 # =========================
-st.set_page_config(page_title="OIS Teacher Self‑Assessment", layout="wide")
+st.set_page_config(page_title="OIS Teacher Appraisal", layout="wide")
 
 # Try to import HttpError; fall back gracefully if googleapiclient isn't present
 try:
@@ -637,8 +694,8 @@ CURRENT_ASSESSMENT_CYCLE = "Final"   # "Initial" or "Final"
 
 FINAL_EVAL_SHEET_NAME = "FinalEvaluation"
 
-FINAL_EVAL_TEACHER_DEADLINE = datetime(2026, 5, 15, 23, 59, 59)
-FINAL_EVAL_APPRAISER_DEADLINE = datetime(2026, 6, 5, 23, 59, 59)
+FINAL_EVAL_TEACHER_DEADLINE = datetime(2026, 4, 30, 23, 59, 59)
+FINAL_EVAL_APPRAISER_DEADLINE = datetime(2026, 5, 20, 23, 59, 59)
 
 FINAL_EVAL_MAX_WORDS_SURVEY = 150
 FINAL_EVAL_MAX_WORDS_REFLECTION = 150
@@ -670,6 +727,19 @@ SUBJECT_AREA_OPTIONS = [
 
 # Optional: list of admin emails (lowercase) in .streamlit/secrets.toml
 ADMINS_FROM_SECRETS = set([e.strip().lower() for e in st.secrets.get("admins", [])])
+
+IST_OFFSET_HOURS = 5
+IST_OFFSET_MINUTES = 30
+
+def now_ist():
+    return datetime.utcnow() + pd.Timedelta(hours=IST_OFFSET_HOURS, minutes=IST_OFFSET_MINUTES)
+
+def now_ist_str():
+    return now_ist().strftime("%Y-%m-%d %H:%M:%S")
+
+def fmt_ist(dt_value):
+    txt = safe_text(dt_value)
+    return txt if txt else "-"
 
 # =========================
 # DOMAINS & SUB-STRANDS (exact from rubric)
@@ -1454,7 +1524,7 @@ if tab == "Final Evaluation" and role == "user":
     )
 
     st.info(f"Appraiser: {appraiser}")
-    st.caption(f"Teacher deadline: {FINAL_EVAL_TEACHER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
+    st.caption(f"Teacher deadline (IST): {FINAL_EVAL_TEACHER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
 
     subject_existing = safe_text(record.get("Subject Area", ""))
     survey_existing = safe_text(record.get("Student Survey Feedback", ""))
@@ -1495,11 +1565,20 @@ if tab == "Final Evaluation" and role == "user":
         or reflection_wc > FINAL_EVAL_MAX_WORDS_REFLECTION
     )
 
+    if survey_wc > FINAL_EVAL_MAX_WORDS_SURVEY:
+        st.error(f"Student Survey Feedback is over the {FINAL_EVAL_MAX_WORDS_SURVEY}-word limit.")
+
+    if reflection_wc > FINAL_EVAL_MAX_WORDS_REFLECTION:
+        st.error(f"Overall Reflection is over the {FINAL_EVAL_MAX_WORDS_REFLECTION}-word limit.")
+
+    if too_many_words:
+        st.warning("Buttons are disabled until both sections are within the word limit.")
+
     col1, col2 = st.columns(2)
 
     with col1:
         if st.button("💾 Save Teacher Section", disabled=teacher_locked or too_many_words):
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now_str = now_ist_str()
 
             updated = {
                 "Timestamp": safe_text(record.get("Timestamp", now_str)) or now_str,
@@ -1535,7 +1614,7 @@ if tab == "Final Evaluation" and role == "user":
 
     with col2:
         if st.button("✅ Submit Teacher Section", disabled=teacher_locked or too_many_words):
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now_str = now_ist_str()
 
             updated = {
                 "Timestamp": safe_text(record.get("Timestamp", now_str)) or now_str,
@@ -1584,20 +1663,23 @@ if tab == "Final Evaluation" and role == "user":
         st.write(f"**Overall Comments:** {safe_text(refreshed.get('Overall Comments', ''))}")
 
         if evaluator_signed_off(teacher_email):
-            st.success(f"Evaluator signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
+            st.success(f"Appraiser signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
 
         if evaluator_signed_off(teacher_email) and not teacher_signed_off_final_eval(teacher_email):
             if st.button("✍️ Teacher Sign Off"):
-                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                st.caption("The teacher’s signature indicates that he or she has seen and discussed the evaluation; it does not necessarily denote agreement with the report.")
+                now_str = now_ist_str()
                 refreshed["Last Edited On"] = now_str
                 refreshed["Teacher Sign Off"] = "Yes"
                 refreshed["Teacher Sign Off Date"] = now_str
                 save_final_eval_record(refreshed)
                 st.success("Teacher sign-off completed.")
                 _rerun()
+            
 
         if teacher_signed_off_final_eval(teacher_email):
             st.success(f"Teacher signed off on {safe_text(refreshed.get('Teacher Sign Off Date', ''))}")
+            st.caption("The teacher’s signature indicates that he or she has seen and discussed the evaluation; it does not necessarily denote agreement with the report.")
 
 # =========================
 # Page: Admin Panel (Admin & Super Admin)
@@ -1835,10 +1917,19 @@ if tab == "Admin" and i_am_admin:
                     domain_values = {}
                     for rating_col, label in final_eval_domain_rows():
                         existing = safe_text(fe_record.get(rating_col, ""))
+                        domain_letter = rating_col.split()[0]
+                        suggested_rating = calculate_domain_rating_suggestion(teacher_email, domain_letter)
+    
+                        if suggested_rating:
+                            st.caption(f"Suggested for {domain_letter}: {suggested_rating}")
+    
+                        default_rating = existing if existing in FINAL_EVAL_RATINGS else suggested_rating
+                        default_index = FINAL_EVAL_RATINGS.index(default_rating) if default_rating in FINAL_EVAL_RATINGS else 0
+    
                         domain_values[rating_col] = st.selectbox(
                             label,
                             FINAL_EVAL_RATINGS,
-                            index=FINAL_EVAL_RATINGS.index(existing) if existing in FINAL_EVAL_RATINGS else 0,
+                            index=default_index,
                             disabled=appraiser_locked,
                             key=f"{teacher_email}_{rating_col}"
                         )
@@ -1871,7 +1962,7 @@ if tab == "Admin" and i_am_admin:
                             disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
                             key=f"{teacher_email}_save_appraiser_eval"
                         ):
-                            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            now_str = now_ist_str()
                             updated = fe_record.copy()
                             updated["Last Edited On"] = now_str
                             updated["Appraiser Started"] = "Yes"
@@ -1892,7 +1983,7 @@ if tab == "Admin" and i_am_admin:
                             disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
                             key=f"{teacher_email}_submit_appraiser_eval"
                         ):
-                            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            now_str = now_ist_str()
                             updated = fe_record.copy()
                             updated["Last Edited On"] = now_str
                             updated["Appraiser Started"] = "Yes"
@@ -1912,17 +2003,17 @@ if tab == "Admin" and i_am_admin:
                     refreshed_fe = get_teacher_final_eval_record(teacher_email)
     
                     if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
-                        if st.button("✍️ Evaluator Sign Off", key=f"{teacher_email}_evaluator_signoff"):
-                            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        if st.button("✍️ Appraiser Sign Off", key=f"{teacher_email}_evaluator_signoff"):
+                            now_str = now_ist_str()
                             refreshed_fe["Last Edited On"] = now_str
                             refreshed_fe["Evaluator Sign Off"] = "Yes"
                             refreshed_fe["Evaluator Sign Off Date"] = now_str
                             save_final_eval_record(refreshed_fe)
-                            st.success("Evaluator sign-off completed.")
+                            st.success("Appraiser sign-off completed.")
                             _rerun()
     
                     if evaluator_signed_off(teacher_email):
-                        st.success(f"Evaluator signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
+                        st.success(f"Appraiser signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
     
                     if teacher_signed_off_final_eval(teacher_email):
                         st.success(f"Teacher signed off on {safe_text(refreshed_fe.get('Teacher Sign Off Date', ''))}")    
