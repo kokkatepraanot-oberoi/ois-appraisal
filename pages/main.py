@@ -718,6 +718,127 @@ def get_full_appraiser_name(appraiser_value: str) -> str:
             matched_names.append(part.title())
 
     return ", ".join(dict.fromkeys(matched_names))
+
+def render_final_evaluation_review_panel(record: dict, heading: str = "Appraiser Review"):
+    rating_colour_map = {
+        "Highly Effective": "#d4edda",
+        "Effective": "#d1ecf1",
+        "Improvement Necessary": "#fff3cd",
+        "Does Not Meet Standards": "#f8d7da",
+    }
+
+    text_colour_map = {
+        "Highly Effective": "#155724",
+        "Effective": "#0c5460",
+        "Improvement Necessary": "#856404",
+        "Does Not Meet Standards": "#721c24",
+    }
+
+    st.markdown(f"### {heading}")
+    st.markdown("#### Ratings on Individual Rubrics")
+
+    cols = st.columns(2)
+    domain_rows = final_eval_domain_rows()
+
+    for i, (col_name, label) in enumerate(domain_rows):
+        rating_value = safe_text(record.get(col_name, ""))
+        bg = rating_colour_map.get(rating_value, "#f4f4f4")
+        fg = text_colour_map.get(rating_value, "#222")
+
+        with cols[i % 2]:
+            st.markdown(
+                f"""
+                <div style="
+                    border: 1px solid #e6e6e6;
+                    border-radius: 12px;
+                    padding: 14px 16px;
+                    margin-bottom: 12px;
+                    background: #ffffff;
+                    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+                ">
+                    <div style="
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #333;
+                        margin-bottom: 10px;
+                    ">
+                        {label}
+                    </div>
+                    <div style="
+                        display: inline-block;
+                        padding: 8px 12px;
+                        border-radius: 999px;
+                        background: {bg};
+                        color: {fg};
+                        font-weight: 700;
+                        font-size: 13px;
+                    ">
+                        {rating_value}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    st.markdown("### Overall Rating")
+
+    overall_rating = safe_text(record.get("Overall Rating", ""))
+    overall_bg = rating_colour_map.get(overall_rating, "#f4f4f4")
+    overall_fg = text_colour_map.get(overall_rating, "#222")
+
+    st.markdown(
+        f"""
+        <div style="
+            border: 2px solid #dcdcdc;
+            border-radius: 14px;
+            padding: 18px;
+            margin-top: 8px;
+            margin-bottom: 14px;
+            background: #fafafa;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+        ">
+            <div style="
+                font-size: 15px;
+                font-weight: 600;
+                color: #333;
+                margin-bottom: 12px;
+            ">
+                Final Overall Rating
+            </div>
+            <div style="
+                display: inline-block;
+                padding: 10px 16px;
+                border-radius: 999px;
+                background: {overall_bg};
+                color: {overall_fg};
+                font-weight: 700;
+                font-size: 15px;
+            ">
+                {overall_rating}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("### Appraiser Comments")
+    st.markdown(
+        f"""
+        <div style="
+            border: 1px solid #e6e6e6;
+            border-radius: 12px;
+            padding: 16px;
+            background: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 12px;
+        ">
+            {safe_text(record.get("Overall Comments", "")).replace("\n", "<br>")}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     
 # =========================
 # UI CONFIG (must be first)
@@ -773,12 +894,11 @@ SUBJECT_AREA_OPTIONS = [
     "Languages",
     "Design",
     "Physical and Health Education",
-    "Arts",
+    "Visual Arts",
+    "Music",
+    "Theatre",
     "Computer Science",
-    "Counselling/SSP",
-    "Learning Support",
-    "Library",
-    "Admin/Operations",
+    "SSP",
     "Other",
 ]
 
@@ -2074,7 +2194,6 @@ if tab == "Admin" and i_am_admin:
                 else:    
                     
                     st.subheader("Final Evaluation")
-        
                     fe_record = get_teacher_final_eval_record(teacher_email)
         
                     if not teacher_final_eval_completed(teacher_email):
@@ -2088,130 +2207,137 @@ if tab == "Admin" and i_am_admin:
                         st.write("**Overall Reflection:**")
                         st.write(safe_text(fe_record.get("Overall Reflection", "")))
         
-                        appraiser_locked = (
-                            not is_before_deadline(FINAL_EVAL_APPRAISER_DEADLINE)
-                            or teacher_signed_off_final_eval(teacher_email)
-                        )
+                        if teacher_signed_off_final_eval(teacher_email):
+                            st.divider()
+                            render_final_evaluation_review_panel(fe_record, heading="Final Signed-Off Review")
         
-                        st.caption(f"Appraiser deadline: {FINAL_EVAL_APPRAISER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
+                            if evaluator_signed_off(teacher_email):
+                                st.success(f"{st.session_state.auth_name} signed off on {safe_text(fe_record.get('Evaluator Sign Off Date', ''))}")
         
-                        domain_values = {}
-                        for rating_col, label in final_eval_domain_rows():
-                            existing = safe_text(fe_record.get(rating_col, ""))
-                            domain_letter = rating_col.split()[0]
-                            suggested_rating = calculate_domain_rating_suggestion(teacher_email, domain_letter)
+                            if teacher_signed_off_final_eval(teacher_email):
+                                st.success(f"{teacher_choice} signed off on {safe_text(fe_record.get('Teacher Sign Off Date', ''))}")
+                        else:
+                            appraiser_locked = (
+                                not is_before_deadline(FINAL_EVAL_APPRAISER_DEADLINE)
+                                or teacher_signed_off_final_eval(teacher_email)
+                            )
         
-                            if suggested_rating:
+                            st.caption(f"Appraiser deadline (IST): {FINAL_EVAL_APPRAISER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
+        
+                            domain_values = {}
+                            for rating_col, label in final_eval_domain_rows():
+                                existing = safe_text(fe_record.get(rating_col, ""))
+                                domain_letter = rating_col.split()[0]
+                                suggested_rating = calculate_domain_rating_suggestion(teacher_email, domain_letter)
+        
+                                if suggested_rating:
+                                    st.markdown(
+                                        f"<div style='color:#c62828; font-weight:600; margin-bottom:6px;'>Suggested for {domain_letter}: {suggested_rating}</div>",
+                                        unsafe_allow_html=True
+                                    )
+        
+                                default_rating = existing if existing in FINAL_EVAL_RATINGS else suggested_rating
+                                default_index = FINAL_EVAL_RATINGS.index(default_rating) if default_rating in FINAL_EVAL_RATINGS else 0
+        
+                                domain_values[rating_col] = st.selectbox(
+                                    label,
+                                    FINAL_EVAL_RATINGS,
+                                    index=default_index,
+                                    disabled=appraiser_locked,
+                                    key=f"{teacher_email}_{rating_col}"
+                                )
+        
+                            overall_suggested_rating = calculate_overall_rating_suggestion(teacher_email)
+        
+                            if overall_suggested_rating:
                                 st.markdown(
-                                    f"<div style='color:#c62828; font-weight:600; margin-bottom:6px;'>Suggested for {domain_letter}: {suggested_rating}</div>",
+                                    f"<div style='color:#c62828; font-weight:600; margin-bottom:6px;'>Suggested Overall Rating: {overall_suggested_rating}</div>",
                                     unsafe_allow_html=True
                                 )
         
-                            default_rating = existing if existing in FINAL_EVAL_RATINGS else suggested_rating
-                            default_index = FINAL_EVAL_RATINGS.index(default_rating) if default_rating in FINAL_EVAL_RATINGS else 0
+                            existing_overall = safe_text(fe_record.get("Overall Rating", ""))
+                            default_overall = existing_overall if existing_overall in FINAL_EVAL_RATINGS else overall_suggested_rating
+                            default_overall_index = FINAL_EVAL_RATINGS.index(default_overall) if default_overall in FINAL_EVAL_RATINGS else 0
         
-                            domain_values[rating_col] = st.selectbox(
-                                label,
+                            overall_rating = st.selectbox(
+                                "Overall Rating",
                                 FINAL_EVAL_RATINGS,
-                                index=default_index,
+                                index=default_overall_index,
                                 disabled=appraiser_locked,
-                                key=f"{teacher_email}_{rating_col}"
+                                key=f"{teacher_email}_overall_rating"
                             )
         
-                        overall_suggested_rating = calculate_overall_rating_suggestion(teacher_email)
-
-                        if overall_suggested_rating:
-                            st.markdown(
-                                f"<div style='color:#c62828; font-weight:600; margin-bottom:6px;'>Suggested Overall Rating: {overall_suggested_rating}</div>",
-                                unsafe_allow_html=True
+                            overall_comments = st.text_area(
+                                "Overall Comments (150 words or less)",
+                                value=safe_text(fe_record.get("Overall Comments", "")),
+                                height=180,
+                                disabled=appraiser_locked,
+                                key=f"{teacher_email}_overall_comments"
                             )
-                        
-                        existing_overall = safe_text(fe_record.get("Overall Rating", ""))
-                        default_overall = existing_overall if existing_overall in FINAL_EVAL_RATINGS else overall_suggested_rating
-                        default_overall_index = FINAL_EVAL_RATINGS.index(default_overall) if default_overall in FINAL_EVAL_RATINGS else 0
-                        
-                        overall_rating = st.selectbox(
-                            "Overall Rating",
-                            FINAL_EVAL_RATINGS,
-                            index=default_overall_index,
-                            disabled=appraiser_locked,
-                            key=f"{teacher_email}_overall_rating"
-                        )
         
-                        overall_comments = st.text_area(
-                            "Overall Comments (150 words or less)",
-                            value=safe_text(fe_record.get("Overall Comments", "")),
-                            height=180,
-                            disabled=appraiser_locked,
-                            key=f"{teacher_email}_overall_comments"
-                        )
+                            comments_wc = count_words(overall_comments)
+                            st.caption(f"Word count: {comments_wc}/{FINAL_EVAL_MAX_WORDS_COMMENTS}")
         
-                        comments_wc = count_words(overall_comments)
-                        st.caption(f"Word count: {comments_wc}/{FINAL_EVAL_MAX_WORDS_COMMENTS}")
+                            col_a, col_b = st.columns(2)
         
-                        col_a, col_b = st.columns(2)
+                            with col_a:
+                                if st.button(
+                                    "💾 Save Appraiser Section",
+                                    disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                                    key=f"{teacher_email}_save_appraiser_eval"
+                                ):
+                                    now_str = now_ist_str()
+                                    updated = fe_record.copy()
+                                    updated["Last Edited On"] = now_str
+                                    updated["Appraiser Started"] = "Yes"
         
-                        with col_a:
-                            if st.button(
-                                "💾 Save Appraiser Section",
-                                disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
-                                key=f"{teacher_email}_save_appraiser_eval"
-                            ):
-                                now_str = now_ist_str()
-                                updated = fe_record.copy()
-                                updated["Last Edited On"] = now_str
-                                updated["Appraiser Started"] = "Yes"
+                                    for k, v in domain_values.items():
+                                        updated[k] = v
         
-                                for k, v in domain_values.items():
-                                    updated[k] = v
+                                    updated["Overall Rating"] = overall_rating
+                                    updated["Overall Comments"] = overall_comments
         
-                                updated["Overall Rating"] = overall_rating
-                                updated["Overall Comments"] = overall_comments
+                                    save_final_eval_record(updated)
+                                    st.success("Appraiser section saved.")
+                                    _rerun()
         
-                                save_final_eval_record(updated)
-                                st.success("Appraiser section saved.")
-                                _rerun()
+                            with col_b:
+                                if st.button(
+                                    "✅ Submit Appraiser Section",
+                                    disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                                    key=f"{teacher_email}_submit_appraiser_eval"
+                                ):
+                                    now_str = now_ist_str()
+                                    updated = fe_record.copy()
+                                    updated["Last Edited On"] = now_str
+                                    updated["Appraiser Started"] = "Yes"
+                                    updated["Appraiser Completed"] = "Yes"
+                                    updated["Appraiser Completed On"] = now_str
         
-                        with col_b:
-                            if st.button(
-                                "✅ Submit Appraiser Section",
-                                disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
-                                key=f"{teacher_email}_submit_appraiser_eval"
-                            ):
-                                now_str = now_ist_str()
-                                updated = fe_record.copy()
-                                updated["Last Edited On"] = now_str
-                                updated["Appraiser Started"] = "Yes"
-                                updated["Appraiser Completed"] = "Yes"
-                                updated["Appraiser Completed On"] = now_str
+                                    for k, v in domain_values.items():
+                                        updated[k] = v
         
-                                for k, v in domain_values.items():
-                                    updated[k] = v
+                                    updated["Overall Rating"] = overall_rating
+                                    updated["Overall Comments"] = overall_comments
         
-                                updated["Overall Rating"] = overall_rating
-                                updated["Overall Comments"] = overall_comments
+                                    save_final_eval_record(updated)
+                                    st.success("Appraiser section submitted.")
+                                    _rerun()
         
-                                save_final_eval_record(updated)
-                                st.success("Appraiser section submitted.")
-                                _rerun()
+                            refreshed_fe = get_teacher_final_eval_record(teacher_email)
         
-                        refreshed_fe = get_teacher_final_eval_record(teacher_email)
+                            if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
+                                if st.button("✍️ Appraiser Sign Off", key=f"{teacher_email}_evaluator_signoff"):
+                                    now_str = now_ist_str()
+                                    refreshed_fe["Last Edited On"] = now_str
+                                    refreshed_fe["Evaluator Sign Off"] = "Yes"
+                                    refreshed_fe["Evaluator Sign Off Date"] = now_str
+                                    save_final_eval_record(refreshed_fe)
+                                    st.success("Appraiser sign-off completed.")
+                                    _rerun()
         
-                        if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
-                            if st.button("✍️ Appraiser Sign Off", key=f"{teacher_email}_evaluator_signoff"):
-                                now_str = now_ist_str()
-                                refreshed_fe["Last Edited On"] = now_str
-                                refreshed_fe["Evaluator Sign Off"] = "Yes"
-                                refreshed_fe["Evaluator Sign Off Date"] = now_str
-                                save_final_eval_record(refreshed_fe)
-                                st.success("Appraiser sign-off completed.")
-                                _rerun()
-        
-                        if evaluator_signed_off(teacher_email):
-                            st.success(f"{st.session_state.auth_name} signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
-                        
-                        if teacher_signed_off_final_eval(teacher_email):
-                            st.success(f"{teacher_choice} signed off on {safe_text(refreshed_fe.get('Teacher Sign Off Date', ''))}")
+                            if evaluator_signed_off(teacher_email):
+                                st.success(f"{st.session_state.auth_name} signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
 
 
 # =========================
