@@ -661,6 +661,29 @@ def calculate_domain_rating_suggestion(teacher_email: str, domain_letter: str):
     elif avg_score >= 1.5:
         return reverse_map[2]
     return reverse_map[1]
+
+def get_full_appraiser_name(appraiser_value: str) -> str:
+    raw = safe_text(appraiser_value).strip()
+    if not raw:
+        return "Not Assigned"
+
+    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
+    if not parts:
+        return raw
+
+    matched_names = []
+
+    for part in parts:
+        match = users_df[
+            users_df["Name"].astype(str).str.strip().str.lower().str.split().str[0] == part
+        ]
+
+        if not match.empty:
+            matched_names.extend(match["Name"].astype(str).tolist())
+        else:
+            matched_names.append(part.title())
+
+    return ", ".join(dict.fromkeys(matched_names))
     
 # =========================
 # UI CONFIG (must be first)
@@ -1520,7 +1543,8 @@ if tab == "Final Evaluation" and role == "user":
     teacher_name = st.session_state.auth_name
 
     me = users_df[users_df["Email"] == teacher_email].iloc[0] if not users_df.empty else {}
-    appraiser = me.get("Appraiser", "Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
+    appraiser_raw = me.get("Appraiser", "Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
+    appraiser = get_full_appraiser_name(appraiser_raw)
 
     if not teacher_can_start_final_evaluation(teacher_email):
         st.warning("You must first submit your Final self-assessment before this section becomes active.")
