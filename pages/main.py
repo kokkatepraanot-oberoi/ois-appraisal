@@ -1135,9 +1135,10 @@ if st.sidebar.button("🚪 **LOGOUT**", type="primary", use_container_width=True
      
 
 # =========================
-# Sidebar: Live progress (no API calls)
+# Sidebar: Live progress (teachers only)
 # =========================
 total_items = sum(len(v) for v in DOMAINS.values())
+
 def current_progress_from_session() -> int:
     count = 0
     for _, items in DOMAINS.items():
@@ -1146,11 +1147,12 @@ def current_progress_from_session() -> int:
                 count += 1
     return count
 
-with st.sidebar.expander("Progress", expanded=True):
-    done = current_progress_from_session()
-    st.progress(done / total_items if total_items else 0.0)
-    st.caption(f"{done}/{total_items} sub‑strands completed")
-
+if st.session_state.get("auth_role") == "user":
+    with st.sidebar.expander("Progress", expanded=True):
+        done = current_progress_from_session()
+        st.progress(done / total_items if total_items else 0.0)
+        st.caption(f"{done}/{total_items} sub-strands completed")
+        
 # Main Nav
 st.title("🌟 OIS Teacher Appraisal 2025-26")
 
