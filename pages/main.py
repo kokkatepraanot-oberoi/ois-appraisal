@@ -1205,6 +1205,14 @@ else:
 
 # This defines `tab`
 tab = st.sidebar.radio("Menu", nav_options, index=0)
+admin_view_mode = None
+
+if tab == "Admin" and i_am_admin:
+    admin_view_mode = st.sidebar.radio(
+        "Jump to",
+        ["View Teacher Self-Assessment", "Self-Assessment Grid"],
+        index=0
+    )
 
 
 
@@ -1799,226 +1807,227 @@ if tab == "Admin" and i_am_admin:
         st.dataframe(summary_df, use_container_width=True)
 
         
-
-        # 🔹 Submissions Grid (My Appraisees) with color coding
-        st.divider()
-        st.subheader("📊 Submissions Grid (My Appraisees)")
-        
-        if not resp_df.empty:
-            appraisee_emails = assigned["Email"].str.strip().str.lower().tolist()
-            df = resp_df[resp_df["Email"].str.strip().str.lower().isin(appraisee_emails)]
-        
-            if not df.empty:
-                # Replace full text with acronyms
-                mapping = {
-                    "Highly Effective": "HE",
-                    "Effective": "E",
-                    "Improvement Necessary": "IN",
-                    "Does Not Meet Standards": "DNMS"
-                }
-                df = df.replace(mapping)
-        
-                       
-                styled_df = df.style.map(highlight_ratings, subset=df.columns[4:])
-                st.dataframe(styled_df, use_container_width=True)
-                
-                st.download_button(
-                    "📥 Download My Appraisees’ Grid (CSV)",
-                    data=df.to_csv(index=False).encode("utf-8"),
-                    file_name=f"{st.session_state.auth_name}_appraisees_grid.csv",
-                    mime="text/csv",
-                )
-            else:
-                st.info("ℹ️ No rubric submissions yet from your appraisees.")
-
-        # Dropdown for deep dive
-        st.divider()
-        st.subheader("🔎 View Individual Submissions")
-        
-        teacher_choice = st.selectbox("Select a teacher", assigned["Name"].tolist())
-        
-        if teacher_choice:
-            teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
-            rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
-
-            # =========================
-            # Initial vs Final Comparison (NEW)
-            # =========================
-            latest_initial, latest_final, comparison_df = build_initial_final_comparison(rows)
-        
-            st.subheader(f"Initial vs Final Comparison for {teacher_choice}")
-        
-            col1, col2 = st.columns(2)
-        
-            with col1:
-                if latest_initial is not None and not latest_initial.empty:
-                    st.info(f"Initial submitted: {safe_text(latest_initial.iloc[0].get('Timestamp', ''))}")
-                else:
-                    st.warning("No Initial submission found.")
-        
-            with col2:
-                if latest_final is not None and not latest_final.empty:
-                    st.info(f"Final submitted: {safe_text(latest_final.iloc[0].get('Timestamp', ''))}")
-                else:
-                    st.warning("No Final submission found.")
-        
-            if not comparison_df.empty:
-                import streamlit.components.v1 as components
-
-                display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
-                components.html(render_comparison_html(display_df), height=900, scrolling=True)
-
-                appraiser_name = safe_text(rows.sort_values("Timestamp", ascending=False).head(1).iloc[0].get("Appraiser", ""))
-
-                printable_html = build_printable_comparison_html(
-                teacher_name=teacher_choice,
-                teacher_email=teacher_email,
-                appraiser=appraiser_name,
-                latest_initial=latest_initial,
-                latest_final=latest_final,
-                display_df=display_df
-                )
-    
-                           
-                csv = display_df.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    f"⬇️ Download Comparison for {teacher_choice}",
-                    data=csv,
-                    file_name=f"{teacher_choice}_comparison.csv",
-                    mime="text/csv"
-                )
-        
+        if admin_view_mode == "Self-Assessment Grid":
+            # 🔹 Submissions Grid (My Appraisees) with color coding
             st.divider()
+            st.subheader("📊 Submissions Grid (My Appraisees)")
+            
+            if not resp_df.empty:
+                appraisee_emails = assigned["Email"].str.strip().str.lower().tolist()
+                df = resp_df[resp_df["Email"].str.strip().str.lower().isin(appraisee_emails)]
+            
+                if not df.empty:
+                    # Replace full text with acronyms
+                    mapping = {
+                        "Highly Effective": "HE",
+                        "Effective": "E",
+                        "Improvement Necessary": "IN",
+                        "Does Not Meet Standards": "DNMS"
+                    }
+                    df = df.replace(mapping)
+            
+                           
+                    styled_df = df.style.map(highlight_ratings, subset=df.columns[4:])
+                    st.dataframe(styled_df, use_container_width=True)
                     
-            if rows.empty:
-                st.warning(f"No submission found for {teacher_choice}.")
-            else:    
-                
-                st.subheader("Final Evaluation")
-    
-                fe_record = get_teacher_final_eval_record(teacher_email)
-    
-                if not teacher_final_eval_completed(teacher_email):
-                    st.info("Teacher has not yet submitted their Final Evaluation section.")
+                    st.download_button(
+                        "📥 Download My Appraisees’ Grid (CSV)",
+                        data=df.to_csv(index=False).encode("utf-8"),
+                        file_name=f"{st.session_state.auth_name}_appraisees_grid.csv",
+                        mime="text/csv",
+                    )
                 else:
-                    st.success("Teacher section submitted.")
+                    st.info("ℹ️ No rubric submissions yet from your appraisees.")
+
+        if admin_view_mode == "View Teacher Self-Assessment":
+            # Dropdown for deep dive
+            st.divider()
+            st.subheader("🔎 View Individual Submissions")
+            
+            teacher_choice = st.selectbox("Select a teacher", assigned["Name"].tolist())
+            
+            if teacher_choice:
+                teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
+                rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
     
-                    st.write(f"**Subject Area:** {safe_text(fe_record.get('Subject Area', ''))}")
-                    st.write("**Student Survey Feedback:**")
-                    st.write(safe_text(fe_record.get("Student Survey Feedback", "")))
-                    st.write("**Overall Reflection:**")
-                    st.write(safe_text(fe_record.get("Overall Reflection", "")))
+                # =========================
+                # Initial vs Final Comparison (NEW)
+                # =========================
+                latest_initial, latest_final, comparison_df = build_initial_final_comparison(rows)
+            
+                st.subheader(f"Initial vs Final Comparison for {teacher_choice}")
+            
+                col1, col2 = st.columns(2)
+            
+                with col1:
+                    if latest_initial is not None and not latest_initial.empty:
+                        st.info(f"Initial submitted: {safe_text(latest_initial.iloc[0].get('Timestamp', ''))}")
+                    else:
+                        st.warning("No Initial submission found.")
+            
+                with col2:
+                    if latest_final is not None and not latest_final.empty:
+                        st.info(f"Final submitted: {safe_text(latest_final.iloc[0].get('Timestamp', ''))}")
+                    else:
+                        st.warning("No Final submission found.")
+            
+                if not comparison_df.empty:
+                    import streamlit.components.v1 as components
     
-                    appraiser_locked = (
-                        not is_before_deadline(FINAL_EVAL_APPRAISER_DEADLINE)
-                        or teacher_signed_off_final_eval(teacher_email)
+                    display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
+                    components.html(render_comparison_html(display_df), height=900, scrolling=True)
+    
+                    appraiser_name = safe_text(rows.sort_values("Timestamp", ascending=False).head(1).iloc[0].get("Appraiser", ""))
+    
+                    printable_html = build_printable_comparison_html(
+                    teacher_name=teacher_choice,
+                    teacher_email=teacher_email,
+                    appraiser=appraiser_name,
+                    latest_initial=latest_initial,
+                    latest_final=latest_final,
+                    display_df=display_df
                     )
-    
-                    st.caption(f"Appraiser deadline: {FINAL_EVAL_APPRAISER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
-    
-                    domain_values = {}
-                    for rating_col, label in final_eval_domain_rows():
-                        existing = safe_text(fe_record.get(rating_col, ""))
-                        domain_letter = rating_col.split()[0]
-                        suggested_rating = calculate_domain_rating_suggestion(teacher_email, domain_letter)
-    
-                        if suggested_rating:
-                            st.caption(f"Suggested for {domain_letter}: {suggested_rating}")
-    
-                        default_rating = existing if existing in FINAL_EVAL_RATINGS else suggested_rating
-                        default_index = FINAL_EVAL_RATINGS.index(default_rating) if default_rating in FINAL_EVAL_RATINGS else 0
-    
-                        domain_values[rating_col] = st.selectbox(
-                            label,
-                            FINAL_EVAL_RATINGS,
-                            index=default_index,
-                            disabled=appraiser_locked,
-                            key=f"{teacher_email}_{rating_col}"
-                        )
-    
-                    existing_overall = safe_text(fe_record.get("Overall Rating", ""))
-                    overall_rating = st.selectbox(
-                        "Overall Rating",
-                        FINAL_EVAL_RATINGS,
-                        index=FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0,
-                        disabled=appraiser_locked,
-                        key=f"{teacher_email}_overall_rating"
+        
+                               
+                    csv = display_df.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        f"⬇️ Download Comparison for {teacher_choice}",
+                        data=csv,
+                        file_name=f"{teacher_choice}_comparison.csv",
+                        mime="text/csv"
                     )
-    
-                    overall_comments = st.text_area(
-                        "Overall Comments (150 words or less)",
-                        value=safe_text(fe_record.get("Overall Comments", "")),
-                        height=180,
-                        disabled=appraiser_locked,
-                        key=f"{teacher_email}_overall_comments"
-                    )
-    
-                    comments_wc = count_words(overall_comments)
-                    st.caption(f"Word count: {comments_wc}/{FINAL_EVAL_MAX_WORDS_COMMENTS}")
-    
-                    col_a, col_b = st.columns(2)
-    
-                    with col_a:
-                        if st.button(
-                            "💾 Save Appraiser Section",
-                            disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
-                            key=f"{teacher_email}_save_appraiser_eval"
-                        ):
-                            now_str = now_ist_str()
-                            updated = fe_record.copy()
-                            updated["Last Edited On"] = now_str
-                            updated["Appraiser Started"] = "Yes"
-    
-                            for k, v in domain_values.items():
-                                updated[k] = v
-    
-                            updated["Overall Rating"] = overall_rating
-                            updated["Overall Comments"] = overall_comments
-    
-                            save_final_eval_record(updated)
-                            st.success("Appraiser section saved.")
-                            _rerun()
-    
-                    with col_b:
-                        if st.button(
-                            "✅ Submit Appraiser Section",
-                            disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
-                            key=f"{teacher_email}_submit_appraiser_eval"
-                        ):
-                            now_str = now_ist_str()
-                            updated = fe_record.copy()
-                            updated["Last Edited On"] = now_str
-                            updated["Appraiser Started"] = "Yes"
-                            updated["Appraiser Completed"] = "Yes"
-                            updated["Appraiser Completed On"] = now_str
-    
-                            for k, v in domain_values.items():
-                                updated[k] = v
-    
-                            updated["Overall Rating"] = overall_rating
-                            updated["Overall Comments"] = overall_comments
-    
-                            save_final_eval_record(updated)
-                            st.success("Appraiser section submitted.")
-                            _rerun()
-    
-                    refreshed_fe = get_teacher_final_eval_record(teacher_email)
-    
-                    if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
-                        if st.button("✍️ Appraiser Sign Off", key=f"{teacher_email}_evaluator_signoff"):
-                            now_str = now_ist_str()
-                            refreshed_fe["Last Edited On"] = now_str
-                            refreshed_fe["Evaluator Sign Off"] = "Yes"
-                            refreshed_fe["Evaluator Sign Off Date"] = now_str
-                            save_final_eval_record(refreshed_fe)
-                            st.success("Appraiser sign-off completed.")
-                            _rerun()
-    
-                    if evaluator_signed_off(teacher_email):
-                        st.success(f"{appraiser} signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
+            
+                st.divider()
+                        
+                if rows.empty:
+                    st.warning(f"No submission found for {teacher_choice}.")
+                else:    
                     
-                    if teacher_signed_off_final_eval(teacher_email):
-                        st.success(f"{teacher_name} signed off on {safe_text(refreshed.get('Teacher Sign Off Date', ''))}")
+                    st.subheader("Final Evaluation")
+        
+                    fe_record = get_teacher_final_eval_record(teacher_email)
+        
+                    if not teacher_final_eval_completed(teacher_email):
+                        st.info("Teacher has not yet submitted their Final Evaluation section.")
+                    else:
+                        st.success("Teacher section submitted.")
+        
+                        st.write(f"**Subject Area:** {safe_text(fe_record.get('Subject Area', ''))}")
+                        st.write("**Student Survey Feedback:**")
+                        st.write(safe_text(fe_record.get("Student Survey Feedback", "")))
+                        st.write("**Overall Reflection:**")
+                        st.write(safe_text(fe_record.get("Overall Reflection", "")))
+        
+                        appraiser_locked = (
+                            not is_before_deadline(FINAL_EVAL_APPRAISER_DEADLINE)
+                            or teacher_signed_off_final_eval(teacher_email)
+                        )
+        
+                        st.caption(f"Appraiser deadline: {FINAL_EVAL_APPRAISER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
+        
+                        domain_values = {}
+                        for rating_col, label in final_eval_domain_rows():
+                            existing = safe_text(fe_record.get(rating_col, ""))
+                            domain_letter = rating_col.split()[0]
+                            suggested_rating = calculate_domain_rating_suggestion(teacher_email, domain_letter)
+        
+                            if suggested_rating:
+                                st.caption(f"Suggested for {domain_letter}: {suggested_rating}")
+        
+                            default_rating = existing if existing in FINAL_EVAL_RATINGS else suggested_rating
+                            default_index = FINAL_EVAL_RATINGS.index(default_rating) if default_rating in FINAL_EVAL_RATINGS else 0
+        
+                            domain_values[rating_col] = st.selectbox(
+                                label,
+                                FINAL_EVAL_RATINGS,
+                                index=default_index,
+                                disabled=appraiser_locked,
+                                key=f"{teacher_email}_{rating_col}"
+                            )
+        
+                        existing_overall = safe_text(fe_record.get("Overall Rating", ""))
+                        overall_rating = st.selectbox(
+                            "Overall Rating",
+                            FINAL_EVAL_RATINGS,
+                            index=FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0,
+                            disabled=appraiser_locked,
+                            key=f"{teacher_email}_overall_rating"
+                        )
+        
+                        overall_comments = st.text_area(
+                            "Overall Comments (150 words or less)",
+                            value=safe_text(fe_record.get("Overall Comments", "")),
+                            height=180,
+                            disabled=appraiser_locked,
+                            key=f"{teacher_email}_overall_comments"
+                        )
+        
+                        comments_wc = count_words(overall_comments)
+                        st.caption(f"Word count: {comments_wc}/{FINAL_EVAL_MAX_WORDS_COMMENTS}")
+        
+                        col_a, col_b = st.columns(2)
+        
+                        with col_a:
+                            if st.button(
+                                "💾 Save Appraiser Section",
+                                disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                                key=f"{teacher_email}_save_appraiser_eval"
+                            ):
+                                now_str = now_ist_str()
+                                updated = fe_record.copy()
+                                updated["Last Edited On"] = now_str
+                                updated["Appraiser Started"] = "Yes"
+        
+                                for k, v in domain_values.items():
+                                    updated[k] = v
+        
+                                updated["Overall Rating"] = overall_rating
+                                updated["Overall Comments"] = overall_comments
+        
+                                save_final_eval_record(updated)
+                                st.success("Appraiser section saved.")
+                                _rerun()
+        
+                        with col_b:
+                            if st.button(
+                                "✅ Submit Appraiser Section",
+                                disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                                key=f"{teacher_email}_submit_appraiser_eval"
+                            ):
+                                now_str = now_ist_str()
+                                updated = fe_record.copy()
+                                updated["Last Edited On"] = now_str
+                                updated["Appraiser Started"] = "Yes"
+                                updated["Appraiser Completed"] = "Yes"
+                                updated["Appraiser Completed On"] = now_str
+        
+                                for k, v in domain_values.items():
+                                    updated[k] = v
+        
+                                updated["Overall Rating"] = overall_rating
+                                updated["Overall Comments"] = overall_comments
+        
+                                save_final_eval_record(updated)
+                                st.success("Appraiser section submitted.")
+                                _rerun()
+        
+                        refreshed_fe = get_teacher_final_eval_record(teacher_email)
+        
+                        if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
+                            if st.button("✍️ Appraiser Sign Off", key=f"{teacher_email}_evaluator_signoff"):
+                                now_str = now_ist_str()
+                                refreshed_fe["Last Edited On"] = now_str
+                                refreshed_fe["Evaluator Sign Off"] = "Yes"
+                                refreshed_fe["Evaluator Sign Off Date"] = now_str
+                                save_final_eval_record(refreshed_fe)
+                                st.success("Appraiser sign-off completed.")
+                                _rerun()
+        
+                        if evaluator_signed_off(teacher_email):
+                            st.success(f"{appraiser} signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
+                        
+                        if teacher_signed_off_final_eval(teacher_email):
+                            st.success(f"{teacher_name} signed off on {safe_text(refreshed.get('Teacher Sign Off Date', ''))}")
 
 
 # =========================
