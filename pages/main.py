@@ -185,7 +185,7 @@ def add_summary_section_to_doc(doc, latest_record):
     No rubric pages, no template content.
     Includes strand code/name, selected rating, and descriptor explanation.
     """
-    doc.add_heading("OIS Teacher Self-Assessment Summary", level=1)
+    doc.add_heading("OIS Teacher Appraisal Summary", level=1)
 
     p = doc.add_paragraph()
     p.add_run("Teacher: ").bold = True
@@ -1082,7 +1082,7 @@ with st.sidebar.expander("Progress", expanded=True):
     st.caption(f"{done}/{total_items} sub‑strands completed")
 
 # Main Nav
-st.title("🌟 OIS Teacher Self-Assessment 2025-26")
+st.title("🌟 OIS Teacher Appraisal 2025-26")
 
 if not st.session_state.auth_email:
     st.info("Please log in from the sidebar to continue.")
@@ -1124,7 +1124,7 @@ else:
     if already_submitted:
         nav_options = ["My Submission"]
     else:
-        nav_options = ["Self-Assessment", "My Submission"]
+        nav_options = ["Self-Assessment (Initial & Final)", "My Submission"]
 
     nav_options.append("Final Evaluation")
 
@@ -1808,231 +1808,124 @@ if tab == "Admin" and i_am_admin:
                     
             if rows.empty:
                 st.warning(f"No submission found for {teacher_choice}.")
-            else:
-                st.subheader(f"Latest submission for {teacher_choice}")
-                latest = rows.sort_values("Timestamp", ascending=False).head(1)
-        
-                # Replace long ratings with short acronyms
-                mapping = {
-                    "Highly Effective": "HE",
-                    "Effective": "E",
-                    "Improvement Necessary": "IN",
-                    "Does Not Meet Standards": "DNMS"
-                }
-                latest = latest.replace(mapping)
-        
-                      
-                styled_latest = latest.style.map(highlight_ratings, subset=latest.columns[4:])
-        
-                # =========================
-                # Descriptor Header + Data Table (Fully Working)
-                # =========================
-                
-                import streamlit.components.v1 as components
-
-                record = latest.iloc[0].to_dict()
-                
-                rating_colors = {
-                    "HE": "#a8e6a1",   # green
-                    "E": "#d0f0fd",    # blue
-                    "IN": "#fff3b0",   # yellow
-                    "DNMS": "#f8a5a5"  # red
-                }
-                
-                # ✅ Only rubric columns (skip metadata)
-                rubric_cols = [col for col in latest.columns if re.match(r'^[A-F][0-9]', col)]
-                
-                header_html = """
-                <div style='overflow-x:auto;'>
-                  <table style='border-collapse:collapse; width:100%; table-layout:auto; font-family:Inter, sans-serif;'>
-                    <tr>
-                """
-                
-                for col in rubric_cols:
-                    rating = record.get(col, "")
-                
-                    # ✅ Use full strand key (fixes missing text issue)
-                    descriptor = ""
-                    if col in DESCRIPTORS and rating in DESCRIPTORS[col]:
-                        descriptor = DESCRIPTORS[col][rating]
-                    elif col in DESCRIPTORS:
-                        descriptor = DESCRIPTORS[col]["HE"]
-                
-                    # Truncate for visible preview
-                    short_desc = (descriptor[:140] + "…") if len(descriptor) > 140 else descriptor
-                    bg_color = rating_colors.get(rating, "#f8f9fa")
-                
-                    # 🧠 Add tooltip hover (full descriptor)
-                    safe_descriptor = descriptor.replace('"', '&quot;').replace("'", "&apos;")
-                
-                    header_html += f"""
-                      <th style='text-align:center; vertical-align:top; padding:10px; border:1px solid #ddd; width:180px;'>
-                        <div style='font-weight:600; color:#111; font-size:13px; margin-bottom:5px; white-space:normal;'>{col}</div>
-                        <div title="{safe_descriptor}"
-                             style='background:{bg_color}; border-radius:6px; padding:6px; line-height:1.4em;
-                                    font-size:11px; text-align:left; color:#111; min-height:60px; white-space:normal;
-                                    overflow-wrap:break-word; cursor:help;'>
-                            {short_desc}
-                        </div>
-                      </th>
-                    """
-
-                
-                header_html += "</tr></table></div>"
-                
-                # ✅ Render HTML header
-                components.html(header_html, height=270, scrolling=True)
-                                
-                # ✅ Then show the actual submission grid below
-                st.dataframe(
-                    latest[["Timestamp", "Email", "Name", "Appraiser"] + rubric_cols].style.map(
-                        highlight_ratings, subset=rubric_cols
-                    ),
-                    use_container_width=True
-                )
-                
-                
-                # ✅ CSV + DOCX Download Buttons
-                csv = rows.to_csv(index=False).encode("utf-8")
-
-                st.download_button(
-                    f"⬇️ Download all submissions for {teacher_choice} (CSV)",
-                    data=csv,
-                    file_name=f"{teacher_choice}_submissions.csv",
-                    mime="text/csv"
-                )
-
-                latest_export = rows.sort_values("Timestamp", ascending=False).head(1).copy()
-
-                try:
-                    docx_buffer = generate_teacher_docx(teacher_choice, latest_export)
-                
-                    st.download_button(
-                        f"📄 Download {teacher_choice}'s Self-Assessment (DOCX)",
-                        data=docx_buffer,
-                        file_name=f"{teacher_choice}_self_assessment_{datetime.now().strftime('%Y%m%d')}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            else:    
+                st.divider()
+                st.subheader("Final Evaluation")
+    
+                fe_record = get_teacher_final_eval_record(teacher_email)
+    
+                if not teacher_final_eval_completed(teacher_email):
+                    st.info("Teacher has not yet submitted their Final Evaluation section.")
+                else:
+                    st.success("Teacher section submitted.")
+    
+                    st.write(f"**Subject Area:** {safe_text(fe_record.get('Subject Area', ''))}")
+                    st.write("**Student Survey Feedback:**")
+                    st.write(safe_text(fe_record.get("Student Survey Feedback", "")))
+                    st.write("**Overall Reflection:**")
+                    st.write(safe_text(fe_record.get("Overall Reflection", "")))
+    
+                    appraiser_locked = (
+                        not is_before_deadline(FINAL_EVAL_APPRAISER_DEADLINE)
+                        or teacher_signed_off_final_eval(teacher_email)
                     )
-                except Exception as e:
-                    st.error(f"Could not generate DOCX for {teacher_choice}: {e}")
-                
-            st.divider()
-            st.subheader("Final Evaluation")
-
-            fe_record = get_teacher_final_eval_record(teacher_email)
-
-            if not teacher_final_eval_completed(teacher_email):
-                st.info("Teacher has not yet submitted their Final Evaluation section.")
-            else:
-                st.success("Teacher section submitted.")
-
-                st.write(f"**Subject Area:** {safe_text(fe_record.get('Subject Area', ''))}")
-                st.write("**Student Survey Feedback:**")
-                st.write(safe_text(fe_record.get("Student Survey Feedback", "")))
-                st.write("**Overall Reflection:**")
-                st.write(safe_text(fe_record.get("Overall Reflection", "")))
-
-                appraiser_locked = (
-                    not is_before_deadline(FINAL_EVAL_APPRAISER_DEADLINE)
-                    or teacher_signed_off_final_eval(teacher_email)
-                )
-
-                st.caption(f"Appraiser deadline: {FINAL_EVAL_APPRAISER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
-
-                domain_values = {}
-                for rating_col, label in final_eval_domain_rows():
-                    existing = safe_text(fe_record.get(rating_col, ""))
-                    domain_values[rating_col] = st.selectbox(
-                        label,
+    
+                    st.caption(f"Appraiser deadline: {FINAL_EVAL_APPRAISER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
+    
+                    domain_values = {}
+                    for rating_col, label in final_eval_domain_rows():
+                        existing = safe_text(fe_record.get(rating_col, ""))
+                        domain_values[rating_col] = st.selectbox(
+                            label,
+                            FINAL_EVAL_RATINGS,
+                            index=FINAL_EVAL_RATINGS.index(existing) if existing in FINAL_EVAL_RATINGS else 0,
+                            disabled=appraiser_locked,
+                            key=f"{teacher_email}_{rating_col}"
+                        )
+    
+                    existing_overall = safe_text(fe_record.get("Overall Rating", ""))
+                    overall_rating = st.selectbox(
+                        "Overall Rating",
                         FINAL_EVAL_RATINGS,
-                        index=FINAL_EVAL_RATINGS.index(existing) if existing in FINAL_EVAL_RATINGS else 0,
+                        index=FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0,
                         disabled=appraiser_locked,
-                        key=f"{teacher_email}_{rating_col}"
+                        key=f"{teacher_email}_overall_rating"
                     )
-
-                existing_overall = safe_text(fe_record.get("Overall Rating", ""))
-                overall_rating = st.selectbox(
-                    "Overall Rating",
-                    FINAL_EVAL_RATINGS,
-                    index=FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0,
-                    disabled=appraiser_locked,
-                    key=f"{teacher_email}_overall_rating"
-                )
-
-                overall_comments = st.text_area(
-                    "Overall Comments (150 words or less)",
-                    value=safe_text(fe_record.get("Overall Comments", "")),
-                    height=180,
-                    disabled=appraiser_locked,
-                    key=f"{teacher_email}_overall_comments"
-                )
-
-                comments_wc = count_words(overall_comments)
-                st.caption(f"Word count: {comments_wc}/{FINAL_EVAL_MAX_WORDS_COMMENTS}")
-
-                col_a, col_b = st.columns(2)
-
-                with col_a:
-                    if st.button(
-                        "💾 Save Appraiser Section",
-                        disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
-                        key=f"{teacher_email}_save_appraiser_eval"
-                    ):
-                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        updated = fe_record.copy()
-                        updated["Last Edited On"] = now_str
-                        updated["Appraiser Started"] = "Yes"
-
-                        for k, v in domain_values.items():
-                            updated[k] = v
-
-                        updated["Overall Rating"] = overall_rating
-                        updated["Overall Comments"] = overall_comments
-
-                        save_final_eval_record(updated)
-                        st.success("Appraiser section saved.")
-                        _rerun()
-
-                with col_b:
-                    if st.button(
-                        "✅ Submit Appraiser Section",
-                        disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
-                        key=f"{teacher_email}_submit_appraiser_eval"
-                    ):
-                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        updated = fe_record.copy()
-                        updated["Last Edited On"] = now_str
-                        updated["Appraiser Started"] = "Yes"
-                        updated["Appraiser Completed"] = "Yes"
-                        updated["Appraiser Completed On"] = now_str
-
-                        for k, v in domain_values.items():
-                            updated[k] = v
-
-                        updated["Overall Rating"] = overall_rating
-                        updated["Overall Comments"] = overall_comments
-
-                        save_final_eval_record(updated)
-                        st.success("Appraiser section submitted.")
-                        _rerun()
-
-                refreshed_fe = get_teacher_final_eval_record(teacher_email)
-
-                if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
-                    if st.button("✍️ Evaluator Sign Off", key=f"{teacher_email}_evaluator_signoff"):
-                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        refreshed_fe["Last Edited On"] = now_str
-                        refreshed_fe["Evaluator Sign Off"] = "Yes"
-                        refreshed_fe["Evaluator Sign Off Date"] = now_str
-                        save_final_eval_record(refreshed_fe)
-                        st.success("Evaluator sign-off completed.")
-                        _rerun()
-
-                if evaluator_signed_off(teacher_email):
-                    st.success(f"Evaluator signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
-
-                if teacher_signed_off_final_eval(teacher_email):
-                    st.success(f"Teacher signed off on {safe_text(refreshed_fe.get('Teacher Sign Off Date', ''))}")    
+    
+                    overall_comments = st.text_area(
+                        "Overall Comments (150 words or less)",
+                        value=safe_text(fe_record.get("Overall Comments", "")),
+                        height=180,
+                        disabled=appraiser_locked,
+                        key=f"{teacher_email}_overall_comments"
+                    )
+    
+                    comments_wc = count_words(overall_comments)
+                    st.caption(f"Word count: {comments_wc}/{FINAL_EVAL_MAX_WORDS_COMMENTS}")
+    
+                    col_a, col_b = st.columns(2)
+    
+                    with col_a:
+                        if st.button(
+                            "💾 Save Appraiser Section",
+                            disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                            key=f"{teacher_email}_save_appraiser_eval"
+                        ):
+                            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            updated = fe_record.copy()
+                            updated["Last Edited On"] = now_str
+                            updated["Appraiser Started"] = "Yes"
+    
+                            for k, v in domain_values.items():
+                                updated[k] = v
+    
+                            updated["Overall Rating"] = overall_rating
+                            updated["Overall Comments"] = overall_comments
+    
+                            save_final_eval_record(updated)
+                            st.success("Appraiser section saved.")
+                            _rerun()
+    
+                    with col_b:
+                        if st.button(
+                            "✅ Submit Appraiser Section",
+                            disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                            key=f"{teacher_email}_submit_appraiser_eval"
+                        ):
+                            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            updated = fe_record.copy()
+                            updated["Last Edited On"] = now_str
+                            updated["Appraiser Started"] = "Yes"
+                            updated["Appraiser Completed"] = "Yes"
+                            updated["Appraiser Completed On"] = now_str
+    
+                            for k, v in domain_values.items():
+                                updated[k] = v
+    
+                            updated["Overall Rating"] = overall_rating
+                            updated["Overall Comments"] = overall_comments
+    
+                            save_final_eval_record(updated)
+                            st.success("Appraiser section submitted.")
+                            _rerun()
+    
+                    refreshed_fe = get_teacher_final_eval_record(teacher_email)
+    
+                    if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
+                        if st.button("✍️ Evaluator Sign Off", key=f"{teacher_email}_evaluator_signoff"):
+                            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            refreshed_fe["Last Edited On"] = now_str
+                            refreshed_fe["Evaluator Sign Off"] = "Yes"
+                            refreshed_fe["Evaluator Sign Off Date"] = now_str
+                            save_final_eval_record(refreshed_fe)
+                            st.success("Evaluator sign-off completed.")
+                            _rerun()
+    
+                    if evaluator_signed_off(teacher_email):
+                        st.success(f"Evaluator signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
+    
+                    if teacher_signed_off_final_eval(teacher_email):
+                        st.success(f"Teacher signed off on {safe_text(refreshed_fe.get('Teacher Sign Off Date', ''))}")    
 
 
 
