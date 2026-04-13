@@ -1210,7 +1210,7 @@ if tab == "Self-Assessment":
                 use_container_width=True
             )
         
-            st.info("Use your Initial submission as a reference while completing your Final self-assessment.")
+            st.info("Use your Initial submission on the sidebar as a reference while completing your Final self-assessment.")
 
         # Selections (direct widgets so sidebar progress updates live)
         selections = {}
