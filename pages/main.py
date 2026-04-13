@@ -1716,16 +1716,13 @@ if tab == "Final Evaluation" and role == "user":
             st.success("Teacher section submitted. Your appraiser can now complete their section.")
             _rerun()
 
-    st.divider()
-    st.markdown("### Appraiser Review")
-    st.markdown("#### RATINGS ON INDIVIDUAL RUBRICS")
-
     refreshed = get_teacher_final_eval_record(teacher_email)
 
     if not appraiser_final_eval_completed(teacher_email):
         st.info("Your appraiser has not completed this section yet.")
     else:
-        st.markdown("### Appraiser Section")
+        st.divider()
+        st.markdown("### Appraiser Review")
         st.markdown("#### Ratings on Individual Rubrics")
     
         rating_colour_map = {
