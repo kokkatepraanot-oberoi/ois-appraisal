@@ -662,6 +662,40 @@ def calculate_domain_rating_suggestion(teacher_email: str, domain_letter: str):
         return reverse_map[2]
     return reverse_map[1]
 
+def calculate_overall_rating_suggestion(teacher_email: str):
+    latest_initial, latest_final, comparison_df = build_teacher_initial_final(teacher_email)
+
+    if comparison_df.empty:
+        return ""
+
+    score_map = {"DNMS": 1, "IN": 2, "E": 3, "HE": 4}
+    reverse_map = {
+        1: "Does Not Meet Standards",
+        2: "Improvement Necessary",
+        3: "Effective",
+        4: "Highly Effective"
+    }
+
+    scores = []
+    for _, row in comparison_df.iterrows():
+        final_val = safe_text(row.get("Final", ""))
+        if final_val in score_map:
+            scores.append(score_map[final_val])
+
+    if not scores:
+        return ""
+
+    avg_score = sum(scores) / len(scores)
+
+    if avg_score >= 3.5:
+        return reverse_map[4]
+    elif avg_score >= 2.5:
+        return reverse_map[3]
+    elif avg_score >= 1.5:
+        return reverse_map[2]
+    return reverse_map[1]
+
+
 def get_full_appraiser_name(appraiser_value: str) -> str:
     raw = safe_text(appraiser_value).strip()
     if not raw:
@@ -1956,7 +1990,10 @@ if tab == "Admin" and i_am_admin:
                             suggested_rating = calculate_domain_rating_suggestion(teacher_email, domain_letter)
         
                             if suggested_rating:
-                                st.caption(f"Suggested for {domain_letter}: {suggested_rating}")
+                                st.markdown(
+                                    f"<div style='color:#c62828; font-weight:600; margin-bottom:6px;'>Suggested for {domain_letter}: {suggested_rating}</div>",
+                                    unsafe_allow_html=True
+                                )
         
                             default_rating = existing if existing in FINAL_EVAL_RATINGS else suggested_rating
                             default_index = FINAL_EVAL_RATINGS.index(default_rating) if default_rating in FINAL_EVAL_RATINGS else 0
@@ -1969,11 +2006,22 @@ if tab == "Admin" and i_am_admin:
                                 key=f"{teacher_email}_{rating_col}"
                             )
         
+                        overall_suggested_rating = calculate_overall_rating_suggestion(teacher_email)
+
+                        if overall_suggested_rating:
+                            st.markdown(
+                                f"<div style='color:#c62828; font-weight:600; margin-bottom:6px;'>Suggested Overall Rating: {overall_suggested_rating}</div>",
+                                unsafe_allow_html=True
+                            )
+                        
                         existing_overall = safe_text(fe_record.get("Overall Rating", ""))
+                        default_overall = existing_overall if existing_overall in FINAL_EVAL_RATINGS else overall_suggested_rating
+                        default_overall_index = FINAL_EVAL_RATINGS.index(default_overall) if default_overall in FINAL_EVAL_RATINGS else 0
+                        
                         overall_rating = st.selectbox(
                             "Overall Rating",
                             FINAL_EVAL_RATINGS,
-                            index=FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0,
+                            index=default_overall_index,
                             disabled=appraiser_locked,
                             key=f"{teacher_email}_overall_rating"
                         )
