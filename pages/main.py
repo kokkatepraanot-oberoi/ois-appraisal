@@ -780,7 +780,7 @@ def with_backoff(fn, *args, **kwargs):
 # =========================
 # ONE-TIME SHEETS CONNECTION (cached)
 # =========================
-@st.cache_resource
+# @st.cache_resource
 # =========================
 # Google Sheet Connections
 # =========================
