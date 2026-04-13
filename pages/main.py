@@ -1809,7 +1809,7 @@ if tab == "Admin" and i_am_admin:
             if rows.empty:
                 st.warning(f"No submission found for {teacher_choice}.")
             else:    
-                st.divider()
+                
                 st.subheader("Final Evaluation")
     
                 fe_record = get_teacher_final_eval_record(teacher_email)
