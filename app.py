@@ -20,7 +20,7 @@ hide_sidebar_style = """
 st.markdown(hide_sidebar_style, unsafe_allow_html=True)
 
 
-st.title("🔐 OIS Teacher Self-Assessment Login")
+st.title("🔐 OIS Teacher Appraisal Login")
 
 # =========================
 # CONFIG
