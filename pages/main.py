@@ -455,7 +455,140 @@ def build_printable_comparison_html(teacher_name, teacher_email, appraiser, late
     """
     return html
 
+# =========================
+# FINAL EVALUATION HELPERS
+# =========================
+def count_words(text):
+    return len(re.findall(r"\b\S+\b", safe_text(text)))
 
+def is_before_deadline(deadline_dt):
+    return datetime.now() <= deadline_dt
+
+def teacher_can_start_final_evaluation(email: str) -> bool:
+    return user_has_submission(email, cycle="Final")
+
+def final_eval_expected_headers():
+    return [
+        "Timestamp",
+        "Last Edited On",
+        "Teacher Email",
+        "Teacher Name",
+        "Appraiser",
+        "Subject Area",
+        "Student Survey Feedback",
+        "Overall Reflection",
+        "Teacher Submitted",
+        "Teacher Submitted On",
+        "Appraiser Started",
+        "Appraiser Completed",
+        "Appraiser Completed On",
+        "A Rating",
+        "B Rating",
+        "C Rating",
+        "D Rating",
+        "E Rating",
+        "F Rating",
+        "Overall Rating",
+        "Overall Comments",
+        "Evaluator Sign Off",
+        "Evaluator Sign Off Date",
+        "Teacher Sign Off",
+        "Teacher Sign Off Date",
+    ]
+
+@st.cache_resource
+def ensure_final_eval_headers_once():
+    exp = final_eval_expected_headers()
+    current = with_backoff(FINAL_EVAL_WS.row_values, 1)
+
+    if not current:
+        with_backoff(FINAL_EVAL_WS.insert_row, exp, 1)
+        return True
+
+    if current != exp:
+        st.warning(
+            "The existing header row in **FinalEvaluation** does not match the expected structure. "
+            "Submissions may misalign if the header was changed manually."
+        )
+    return True
+
+@st.cache_data(ttl=180)
+def load_final_eval_df():
+    vals = with_backoff(FINAL_EVAL_WS.get_all_values)
+    if not vals:
+        return pd.DataFrame(columns=final_eval_expected_headers())
+
+    header, rows = vals[0], vals[1:]
+    df = pd.DataFrame(rows, columns=header) if rows else pd.DataFrame(columns=header)
+
+    if "Teacher Email" in df.columns:
+        df["Teacher Email"] = df["Teacher Email"].astype(str).str.strip().str.lower()
+
+    if "Appraiser" in df.columns:
+        df["Appraiser"] = df["Appraiser"].astype(str).str.strip().str.lower()
+
+    return df
+
+def get_teacher_final_eval_record(teacher_email: str):
+    df = load_final_eval_df()
+    if df.empty:
+        return {}
+
+    teacher_email = teacher_email.strip().lower()
+    rows = df[df["Teacher Email"] == teacher_email]
+
+    if rows.empty:
+        return {}
+
+    if "Timestamp" in rows.columns:
+        rows = rows.sort_values("Timestamp", ascending=False)
+
+    return dict(rows.iloc[0])
+
+def save_final_eval_record(record: dict):
+    headers = final_eval_expected_headers()
+    df = load_final_eval_df()
+
+    teacher_email = safe_text(record.get("Teacher Email", "")).strip().lower()
+    row_values = [record.get(col, "") for col in headers]
+
+    if not df.empty and "Teacher Email" in df.columns:
+        matches = df[df["Teacher Email"].astype(str).str.strip().str.lower() == teacher_email]
+        if not matches.empty:
+            row_num = matches.index[0] + 2
+            with_backoff(FINAL_EVAL_WS.update, f"A{row_num}:Y{row_num}", [row_values])
+            load_final_eval_df.clear()
+            return
+
+    with_backoff(FINAL_EVAL_WS.append_row, row_values, value_input_option="USER_ENTERED")
+    load_final_eval_df.clear()
+
+def teacher_final_eval_completed(teacher_email: str) -> bool:
+    rec = get_teacher_final_eval_record(teacher_email)
+    return safe_text(rec.get("Teacher Submitted", "")).strip().lower() == "yes"
+
+def appraiser_final_eval_completed(teacher_email: str) -> bool:
+    rec = get_teacher_final_eval_record(teacher_email)
+    return safe_text(rec.get("Appraiser Completed", "")).strip().lower() == "yes"
+
+def evaluator_signed_off(teacher_email: str) -> bool:
+    rec = get_teacher_final_eval_record(teacher_email)
+    return safe_text(rec.get("Evaluator Sign Off", "")).strip().lower() == "yes"
+
+def teacher_signed_off_final_eval(teacher_email: str) -> bool:
+    rec = get_teacher_final_eval_record(teacher_email)
+    return safe_text(rec.get("Teacher Sign Off", "")).strip().lower() == "yes"
+
+def final_eval_domain_rows():
+    return [
+        ("A Rating", "A. Planning and Preparation for Learning"),
+        ("B Rating", "B. Classroom Management"),
+        ("C Rating", "C. Delivery of Instruction"),
+        ("D Rating", "D. Monitoring, Assessment, and Follow-Up"),
+        ("E Rating", "E. Family and Community Outreach"),
+        ("F Rating", "F. Professional Responsibilities"),
+    ]
+    
 # =========================
 # UI CONFIG (must be first)
 # =========================
@@ -485,6 +618,37 @@ SPREADSHEET_ID = "1kqcfnMx4KhqQvFljsTwSOcmuEHnkLAdwp_pUJypOjpY"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 ENABLE_REFLECTIONS = True  # set False to hide reflection boxes
 CURRENT_ASSESSMENT_CYCLE = "Final"   # "Initial" or "Final"
+
+FINAL_EVAL_SHEET_NAME = "FinalEvaluation"
+
+FINAL_EVAL_TEACHER_DEADLINE = datetime(2026, 5, 15, 23, 59, 59)
+FINAL_EVAL_APPRAISER_DEADLINE = datetime(2026, 6, 5, 23, 59, 59)
+
+FINAL_EVAL_MAX_WORDS_SURVEY = 150
+FINAL_EVAL_MAX_WORDS_REFLECTION = 150
+FINAL_EVAL_MAX_WORDS_COMMENTS = 150
+
+FINAL_EVAL_RATINGS = [
+    "Highly Effective",
+    "Effective",
+    "Improvement Necessary",
+    "Does Not Meet Standards",
+]
+
+SUBJECT_AREA_OPTIONS = [
+    "English",
+    "Mathematics",
+    "Science",
+    "Individuals and Societies",
+    "Languages",
+    "Design",
+    "Physical and Health Education",
+    "Visual Arts",
+    "Drama/Theatre",
+    "Music",
+    "Computer Science",
+    "SSP",
+]
 
 # Optional: list of admin emails (lowercase) in .streamlit/secrets.toml
 ADMINS_FROM_SECRETS = set([e.strip().lower() for e in st.secrets.get("admins", [])])
@@ -602,6 +766,7 @@ def with_backoff(fn, *args, **kwargs):
 # =========================
 # Google Sheet Connections
 # =========================
+@st.cache_resource
 def get_worksheets():
     client = gspread.authorize(
         Credentials.from_service_account_info(st.secrets["google"], scopes=SCOPES)
@@ -610,15 +775,21 @@ def get_worksheets():
 
     resp_ws = sh.worksheet("Responses")
     users_ws = sh.worksheet("Users")
+
     try:
         drafts_ws = sh.worksheet("Drafts")
     except gspread.exceptions.WorksheetNotFound:
-        # Create if missing
         drafts_ws = sh.add_worksheet(title="Drafts", rows="1000", cols="100")
-        drafts_ws.update([["Email"]])  # initialize header
-    return resp_ws, users_ws, drafts_ws
+        drafts_ws.update([["Email"]])
 
-RESP_WS, USERS_WS, DRAFTS_WS = get_worksheets()
+    try:
+        final_eval_ws = sh.worksheet(FINAL_EVAL_SHEET_NAME)
+    except gspread.exceptions.WorksheetNotFound:
+        final_eval_ws = sh.add_worksheet(title=FINAL_EVAL_SHEET_NAME, rows="1000", cols="50")
+
+    return resp_ws, users_ws, drafts_ws, final_eval_ws
+
+RESP_WS, USERS_WS, DRAFTS_WS, FINAL_EVAL_WS = get_worksheets()
 
 # =========================
 # DRAFT HELPERS
@@ -690,6 +861,7 @@ def ensure_headers_once():
     return True
 
 ensure_headers_once()
+ensure_final_eval_headers_once()
 
 # =========================
 # USERS: read ONCE per server process (auto‑detect headers)
@@ -1094,28 +1266,32 @@ if tab == "Self-Assessment":
 
         # Handle Submit
         if submit:
-            row = [
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                st.session_state.auth_email,
-                st.session_state.auth_name,
-                appraiser,
-                CURRENT_ASSESSMENT_CYCLE,
-            ]
-            for domain, items in DOMAINS.items():
-                for code, label in items:
-                    row.append(selections[f"{code} {label}"])
-                if ENABLE_REFLECTIONS:
-                    row.append(reflections.get(domain, ""))
-
-            try:
-                with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
-                load_responses_df.clear()
-                st.session_state.submitted = True
-                st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
-            except Exception as e:
-                st.error("⚠️ Could not submit right now. Please try again shortly.")
-                st.caption(f"Debug info: {e}")
-
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+        row = [
+            now_str,
+            st.session_state.auth_email,
+            st.session_state.auth_name,
+            appraiser,
+            CURRENT_ASSESSMENT_CYCLE,
+        ]
+    
+        for domain, items in DOMAINS.items():
+            for code, label in items:
+                row.append(selections[f"{code} {label}"])
+            if ENABLE_REFLECTIONS:
+                row.append(reflections.get(domain, ""))
+    
+        row.append(now_str)  # Last Edited On
+    
+        try:
+            with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
+            load_responses_df.clear()
+            st.session_state.submitted = True
+            st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
+        except Exception as e:
+            st.error("⚠️ Could not submit right now. Please try again shortly.")
+            st.caption(f"Debug info: {e}")
 
 # =========================
 # Page: My Submission (teachers see their data here)
