@@ -1723,7 +1723,7 @@ if tab == "Final Evaluation" and role == "user":
     refreshed = get_teacher_final_eval_record(teacher_email)
 
     if not appraiser_final_eval_completed(teacher_email):
-    st.info("Your appraiser has not completed this section yet.")
+        st.info("Your appraiser has not completed this section yet.")
     else:
         st.markdown("### Appraiser Section")
         st.markdown("#### Ratings on Individual Rubrics")
