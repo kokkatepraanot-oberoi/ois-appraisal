@@ -1208,9 +1208,9 @@ tab = st.sidebar.radio("Menu", nav_options, index=0)
 admin_view_mode = None
 
 if tab == "Admin" and i_am_admin:
-    admin_view_mode = st.sidebar.radio(
+    admin_view_mode = st.sidebar.selectbox(
         "Jump to",
-        ["View Teacher Self-Assessment", "Self-Assessment Grid"],
+        ["", "View Teacher Self-Assessment", "Self-Assessment Grid"],
         index=0
     )
 
