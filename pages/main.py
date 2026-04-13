@@ -1717,19 +1717,133 @@ if tab == "Final Evaluation" and role == "user":
             _rerun()
 
     st.divider()
-    st.markdown("### Appraiser Section")
+    st.markdown("### Appraiser Review")
     st.markdown("#### RATINGS ON INDIVIDUAL RUBRICS")
 
     refreshed = get_teacher_final_eval_record(teacher_email)
 
     if not appraiser_final_eval_completed(teacher_email):
-        st.info("Your appraiser has not completed this section yet.")
+    st.info("Your appraiser has not completed this section yet.")
     else:
-        for col_name, label in final_eval_domain_rows():
-            st.write(f"**{label}:** {safe_text(refreshed.get(col_name, ''))}")
-
-        st.write(f"**Overall Rating:** {safe_text(refreshed.get('Overall Rating', ''))}")
-        st.write(f"**Overall Comments:** {safe_text(refreshed.get('Overall Comments', ''))}")
+        st.markdown("### Appraiser Section")
+        st.markdown("#### Ratings on Individual Rubrics")
+    
+        rating_colour_map = {
+            "Highly Effective": "#d4edda",
+            "Effective": "#d1ecf1",
+            "Improvement Necessary": "#fff3cd",
+            "Does Not Meet Standards": "#f8d7da",
+        }
+    
+        text_colour_map = {
+            "Highly Effective": "#155724",
+            "Effective": "#0c5460",
+            "Improvement Necessary": "#856404",
+            "Does Not Meet Standards": "#721c24",
+        }
+    
+        cols = st.columns(2)
+        domain_rows = final_eval_domain_rows()
+    
+        for i, (col_name, label) in enumerate(domain_rows):
+            rating_value = safe_text(refreshed.get(col_name, ""))
+            bg = rating_colour_map.get(rating_value, "#f4f4f4")
+            fg = text_colour_map.get(rating_value, "#222")
+    
+            with cols[i % 2]:
+                st.markdown(
+                    f"""
+                    <div style="
+                        border: 1px solid #e6e6e6;
+                        border-radius: 12px;
+                        padding: 14px 16px;
+                        margin-bottom: 12px;
+                        background: #ffffff;
+                        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+                    ">
+                        <div style="
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #333;
+                            margin-bottom: 10px;
+                        ">
+                            {label}
+                        </div>
+                        <div style="
+                            display: inline-block;
+                            padding: 8px 12px;
+                            border-radius: 999px;
+                            background: {bg};
+                            color: {fg};
+                            font-weight: 700;
+                            font-size: 13px;
+                        ">
+                            {rating_value}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+    
+        st.markdown("### Overall Rating")
+    
+        overall_rating = safe_text(refreshed.get("Overall Rating", ""))
+        overall_bg = rating_colour_map.get(overall_rating, "#f4f4f4")
+        overall_fg = text_colour_map.get(overall_rating, "#222")
+    
+        st.markdown(
+            f"""
+            <div style="
+                border: 2px solid #dcdcdc;
+                border-radius: 14px;
+                padding: 18px;
+                margin-top: 8px;
+                margin-bottom: 14px;
+                background: #fafafa;
+                box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+            ">
+                <div style="
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: #333;
+                    margin-bottom: 12px;
+                ">
+                    Final Overall Rating
+                </div>
+                <div style="
+                    display: inline-block;
+                    padding: 10px 16px;
+                    border-radius: 999px;
+                    background: {overall_bg};
+                    color: {overall_fg};
+                    font-weight: 700;
+                    font-size: 15px;
+                ">
+                    {overall_rating}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+        st.markdown("### Appraiser Comments")
+        st.markdown(
+            f"""
+            <div style="
+                border: 1px solid #e6e6e6;
+                border-radius: 12px;
+                padding: 16px;
+                background: #ffffff;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+                line-height: 1.6;
+                color: #333;
+                margin-bottom: 12px;
+            ">
+                {safe_text(refreshed.get("Overall Comments", "")).replace("\n", "<br>")}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         if evaluator_signed_off(teacher_email):
             st.success(f"{appraiser} signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
