@@ -1718,6 +1718,7 @@ if tab == "Final Evaluation" and role == "user":
 
     st.divider()
     st.markdown("### Appraiser Section")
+    st.markdown("#### RATINGS ON INDIVIDUAL RUBRICS")
 
     refreshed = get_teacher_final_eval_record(teacher_email)
 
