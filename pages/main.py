@@ -2024,10 +2024,10 @@ if tab == "Admin" and i_am_admin:
                                 _rerun()
         
                         if evaluator_signed_off(teacher_email):
-                            st.success(f"{appraiser} signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
+                            st.success(f"{st.session_state.auth_name} signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
                         
                         if teacher_signed_off_final_eval(teacher_email):
-                            st.success(f"{teacher_name} signed off on {safe_text(refreshed.get('Teacher Sign Off Date', ''))}")
+                            st.success(f"{teacher_choice} signed off on {safe_text(refreshed_fe.get('Teacher Sign Off Date', ''))}")
 
 
 # =========================
