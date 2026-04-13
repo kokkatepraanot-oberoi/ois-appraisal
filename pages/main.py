@@ -1673,7 +1673,7 @@ if tab == "Final Evaluation" and role == "user":
         st.write(f"**Overall Comments:** {safe_text(refreshed.get('Overall Comments', ''))}")
 
         if evaluator_signed_off(teacher_email):
-            st.success(f"Appraiser signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
+            st.success(f"{appraiser} signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
 
         if evaluator_signed_off(teacher_email) and not teacher_signed_off_final_eval(teacher_email):
             if st.button("✍️ Teacher Sign Off"):
@@ -1688,7 +1688,7 @@ if tab == "Final Evaluation" and role == "user":
             
 
         if teacher_signed_off_final_eval(teacher_email):
-            st.success(f"Teacher signed off on {safe_text(refreshed.get('Teacher Sign Off Date', ''))}")
+            st.success(f"{teacher_name} signed off on {safe_text(refreshed.get('Teacher Sign Off Date', ''))}")
             st.caption("The teacher’s signature indicates that he or she has seen and discussed the evaluation; it does not necessarily denote agreement with the report.")
 
 # =========================
