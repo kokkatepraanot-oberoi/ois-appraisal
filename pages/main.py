@@ -1141,7 +1141,7 @@ tab = st.sidebar.radio("Menu", nav_options, index=0)
 # =========================
 from descriptors import DESCRIPTORS  # 👈 make sure descriptors.py is in same folder
 
-if tab == "Self-Assessment":
+if tab == "Self-Assessment (Initial & Final)":
     if already_submitted and not i_am_admin:
         # Auto-redirect teachers with submissions to My Submission
         st.success("✅ You’ve already submitted your self-assessment. Redirecting to your submission...")
