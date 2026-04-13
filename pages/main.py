@@ -1119,10 +1119,17 @@ if i_am_sadmin:
 elif i_am_admin:
     nav_options = ["Admin"]
 else:
+    teacher_has_final_self = teacher_can_start_final_evaluation(st.session_state.auth_email)
+
     if already_submitted:
         nav_options = ["My Submission"]
     else:
         nav_options = ["Self-Assessment", "My Submission"]
+
+    nav_options.append("Final Evaluation")
+
+    if not teacher_has_final_self:
+        st.sidebar.caption("Final Evaluation unlocks after Final self-assessment submission.")
 
 # This defines `tab`
 tab = st.sidebar.radio("Menu", nav_options, index=0)
@@ -1373,6 +1380,29 @@ if tab == "My Submission":
            comparison_display = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
            components.html(render_comparison_html(comparison_display), height=900, scrolling=True)
 
+        st.divider()
+        st.markdown("### Final Evaluation Status")
+
+        fe_record = get_teacher_final_eval_record(st.session_state.auth_email)
+
+        if not fe_record:
+            if teacher_can_start_final_evaluation(st.session_state.auth_email):
+                st.info("Final Evaluation is available but not yet started.")
+            else:
+                st.info("Final Evaluation will unlock after your Final self-assessment submission.")
+        else:
+            st.write(f"**Teacher Submitted:** {safe_text(fe_record.get('Teacher Submitted', 'No'))}")
+            st.write(f"**Appraiser Completed:** {safe_text(fe_record.get('Appraiser Completed', 'No'))}")
+            st.write(f"**Teacher Sign Off:** {safe_text(fe_record.get('Teacher Sign Off', 'No'))}")
+
+            if appraiser_final_eval_completed(st.session_state.auth_email):
+                st.markdown("#### Final Evaluation Ratings")
+                for col_name, label in final_eval_domain_rows():
+                    st.write(f"**{label}:** {safe_text(fe_record.get(col_name, ''))}")
+
+                st.write(f"**Overall Rating:** {safe_text(fe_record.get('Overall Rating', ''))}")
+                st.write(f"**Overall Comments:** {safe_text(fe_record.get('Overall Comments', ''))}")
+        
         # Optional CSV downloads
         if latest_initial is not None and not latest_initial.empty:
             init_csv = latest_initial.to_csv(index=False).encode("utf-8")
@@ -1400,7 +1430,174 @@ if tab == "My Submission":
             mime="text/csv"
         )
   
+# =========================
+# Page: Final Evaluation (Teacher)
+# =========================
+if tab == "Final Evaluation" and role == "user":
+    st.subheader("Final Evaluation")
 
+    teacher_email = st.session_state.auth_email.strip().lower()
+    teacher_name = st.session_state.auth_name
+
+    me = users_df[users_df["Email"] == teacher_email].iloc[0] if not users_df.empty else {}
+    appraiser = me.get("Appraiser", "Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
+
+    if not teacher_can_start_final_evaluation(teacher_email):
+        st.warning("You must first submit your Final self-assessment before this section becomes active.")
+        st.stop()
+
+    record = get_teacher_final_eval_record(teacher_email)
+
+    teacher_locked = (
+        not is_before_deadline(FINAL_EVAL_TEACHER_DEADLINE)
+        or teacher_final_eval_completed(teacher_email)
+    )
+
+    st.info(f"Appraiser: {appraiser}")
+    st.caption(f"Teacher deadline: {FINAL_EVAL_TEACHER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
+
+    subject_existing = safe_text(record.get("Subject Area", ""))
+    survey_existing = safe_text(record.get("Student Survey Feedback", ""))
+    reflection_existing = safe_text(record.get("Overall Reflection", ""))
+
+    subject_index = SUBJECT_AREA_OPTIONS.index(subject_existing) if subject_existing in SUBJECT_AREA_OPTIONS else 0
+
+    subject_area = st.selectbox(
+        "Subject Area",
+        SUBJECT_AREA_OPTIONS,
+        index=subject_index,
+        disabled=teacher_locked,
+        key="fe_subject_area"
+    )
+
+    student_survey_feedback = st.text_area(
+        "Student Survey Feedback (150 words or less)",
+        value=survey_existing,
+        height=180,
+        disabled=teacher_locked,
+        key="fe_student_survey"
+    )
+    survey_wc = count_words(student_survey_feedback)
+    st.caption(f"Word count: {survey_wc}/{FINAL_EVAL_MAX_WORDS_SURVEY}")
+
+    overall_reflection = st.text_area(
+        "Overall Reflection on the school year (150 words or less)",
+        value=reflection_existing,
+        height=180,
+        disabled=teacher_locked,
+        key="fe_overall_reflection"
+    )
+    reflection_wc = count_words(overall_reflection)
+    st.caption(f"Word count: {reflection_wc}/{FINAL_EVAL_MAX_WORDS_REFLECTION}")
+
+    too_many_words = (
+        survey_wc > FINAL_EVAL_MAX_WORDS_SURVEY
+        or reflection_wc > FINAL_EVAL_MAX_WORDS_REFLECTION
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("💾 Save Teacher Section", disabled=teacher_locked or too_many_words):
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            updated = {
+                "Timestamp": safe_text(record.get("Timestamp", now_str)) or now_str,
+                "Last Edited On": now_str,
+                "Teacher Email": teacher_email,
+                "Teacher Name": teacher_name,
+                "Appraiser": appraiser,
+                "Subject Area": subject_area,
+                "Student Survey Feedback": student_survey_feedback,
+                "Overall Reflection": overall_reflection,
+                "Teacher Submitted": safe_text(record.get("Teacher Submitted", "")),
+                "Teacher Submitted On": safe_text(record.get("Teacher Submitted On", "")),
+                "Appraiser Started": safe_text(record.get("Appraiser Started", "")),
+                "Appraiser Completed": safe_text(record.get("Appraiser Completed", "")),
+                "Appraiser Completed On": safe_text(record.get("Appraiser Completed On", "")),
+                "A Rating": safe_text(record.get("A Rating", "")),
+                "B Rating": safe_text(record.get("B Rating", "")),
+                "C Rating": safe_text(record.get("C Rating", "")),
+                "D Rating": safe_text(record.get("D Rating", "")),
+                "E Rating": safe_text(record.get("E Rating", "")),
+                "F Rating": safe_text(record.get("F Rating", "")),
+                "Overall Rating": safe_text(record.get("Overall Rating", "")),
+                "Overall Comments": safe_text(record.get("Overall Comments", "")),
+                "Evaluator Sign Off": safe_text(record.get("Evaluator Sign Off", "")),
+                "Evaluator Sign Off Date": safe_text(record.get("Evaluator Sign Off Date", "")),
+                "Teacher Sign Off": safe_text(record.get("Teacher Sign Off", "")),
+                "Teacher Sign Off Date": safe_text(record.get("Teacher Sign Off Date", "")),
+            }
+
+            save_final_eval_record(updated)
+            st.success("Teacher section saved.")
+            _rerun()
+
+    with col2:
+        if st.button("✅ Submit Teacher Section", disabled=teacher_locked or too_many_words):
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            updated = {
+                "Timestamp": safe_text(record.get("Timestamp", now_str)) or now_str,
+                "Last Edited On": now_str,
+                "Teacher Email": teacher_email,
+                "Teacher Name": teacher_name,
+                "Appraiser": appraiser,
+                "Subject Area": subject_area,
+                "Student Survey Feedback": student_survey_feedback,
+                "Overall Reflection": overall_reflection,
+                "Teacher Submitted": "Yes",
+                "Teacher Submitted On": now_str,
+                "Appraiser Started": safe_text(record.get("Appraiser Started", "")),
+                "Appraiser Completed": safe_text(record.get("Appraiser Completed", "")),
+                "Appraiser Completed On": safe_text(record.get("Appraiser Completed On", "")),
+                "A Rating": safe_text(record.get("A Rating", "")),
+                "B Rating": safe_text(record.get("B Rating", "")),
+                "C Rating": safe_text(record.get("C Rating", "")),
+                "D Rating": safe_text(record.get("D Rating", "")),
+                "E Rating": safe_text(record.get("E Rating", "")),
+                "F Rating": safe_text(record.get("F Rating", "")),
+                "Overall Rating": safe_text(record.get("Overall Rating", "")),
+                "Overall Comments": safe_text(record.get("Overall Comments", "")),
+                "Evaluator Sign Off": safe_text(record.get("Evaluator Sign Off", "")),
+                "Evaluator Sign Off Date": safe_text(record.get("Evaluator Sign Off Date", "")),
+                "Teacher Sign Off": safe_text(record.get("Teacher Sign Off", "")),
+                "Teacher Sign Off Date": safe_text(record.get("Teacher Sign Off Date", "")),
+            }
+
+            save_final_eval_record(updated)
+            st.success("Teacher section submitted. Your appraiser can now complete their section.")
+            _rerun()
+
+    st.divider()
+    st.markdown("### Appraiser Section")
+
+    refreshed = get_teacher_final_eval_record(teacher_email)
+
+    if not appraiser_final_eval_completed(teacher_email):
+        st.info("Your appraiser has not completed this section yet.")
+    else:
+        for col_name, label in final_eval_domain_rows():
+            st.write(f"**{label}:** {safe_text(refreshed.get(col_name, ''))}")
+
+        st.write(f"**Overall Rating:** {safe_text(refreshed.get('Overall Rating', ''))}")
+        st.write(f"**Overall Comments:** {safe_text(refreshed.get('Overall Comments', ''))}")
+
+        if evaluator_signed_off(teacher_email):
+            st.success(f"Evaluator signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
+
+        if evaluator_signed_off(teacher_email) and not teacher_signed_off_final_eval(teacher_email):
+            if st.button("✍️ Teacher Sign Off"):
+                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                refreshed["Last Edited On"] = now_str
+                refreshed["Teacher Sign Off"] = "Yes"
+                refreshed["Teacher Sign Off Date"] = now_str
+                save_final_eval_record(refreshed)
+                st.success("Teacher sign-off completed.")
+                _rerun()
+
+        if teacher_signed_off_final_eval(teacher_email):
+            st.success(f"Teacher signed off on {safe_text(refreshed.get('Teacher Sign Off Date', ''))}")
 
 # =========================
 # Page: Admin Panel (Admin & Super Admin)
@@ -1494,6 +1691,8 @@ if tab == "Admin" and i_am_admin:
                 "Email": teacher_email,
                 "Initial Status": initial_status,
                 "Final Status": final_status,
+                "Teacher Final Eval": "✅ Submitted" if teacher_final_eval_completed(teacher_email) else "❌ Pending",
+                "Appraiser Final Eval": "✅ Completed" if appraiser_final_eval_completed(teacher_email) else "❌ Pending",
                 "Last Initial": last_initial_date,
                 "Last Final": last_final_date,
             })
@@ -1717,7 +1916,123 @@ if tab == "Admin" and i_am_admin:
                 except Exception as e:
                     st.error(f"Could not generate DOCX for {teacher_choice}: {e}")
                 
-                
+            st.divider()
+            st.subheader("Final Evaluation")
+
+            fe_record = get_teacher_final_eval_record(teacher_email)
+
+            if not teacher_final_eval_completed(teacher_email):
+                st.info("Teacher has not yet submitted their Final Evaluation section.")
+            else:
+                st.success("Teacher section submitted.")
+
+                st.write(f"**Subject Area:** {safe_text(fe_record.get('Subject Area', ''))}")
+                st.write("**Student Survey Feedback:**")
+                st.write(safe_text(fe_record.get("Student Survey Feedback", "")))
+                st.write("**Overall Reflection:**")
+                st.write(safe_text(fe_record.get("Overall Reflection", "")))
+
+                appraiser_locked = (
+                    not is_before_deadline(FINAL_EVAL_APPRAISER_DEADLINE)
+                    or teacher_signed_off_final_eval(teacher_email)
+                )
+
+                st.caption(f"Appraiser deadline: {FINAL_EVAL_APPRAISER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
+
+                domain_values = {}
+                for rating_col, label in final_eval_domain_rows():
+                    existing = safe_text(fe_record.get(rating_col, ""))
+                    domain_values[rating_col] = st.selectbox(
+                        label,
+                        FINAL_EVAL_RATINGS,
+                        index=FINAL_EVAL_RATINGS.index(existing) if existing in FINAL_EVAL_RATINGS else 0,
+                        disabled=appraiser_locked,
+                        key=f"{teacher_email}_{rating_col}"
+                    )
+
+                existing_overall = safe_text(fe_record.get("Overall Rating", ""))
+                overall_rating = st.selectbox(
+                    "Overall Rating",
+                    FINAL_EVAL_RATINGS,
+                    index=FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0,
+                    disabled=appraiser_locked,
+                    key=f"{teacher_email}_overall_rating"
+                )
+
+                overall_comments = st.text_area(
+                    "Overall Comments (150 words or less)",
+                    value=safe_text(fe_record.get("Overall Comments", "")),
+                    height=180,
+                    disabled=appraiser_locked,
+                    key=f"{teacher_email}_overall_comments"
+                )
+
+                comments_wc = count_words(overall_comments)
+                st.caption(f"Word count: {comments_wc}/{FINAL_EVAL_MAX_WORDS_COMMENTS}")
+
+                col_a, col_b = st.columns(2)
+
+                with col_a:
+                    if st.button(
+                        "💾 Save Appraiser Section",
+                        disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                        key=f"{teacher_email}_save_appraiser_eval"
+                    ):
+                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        updated = fe_record.copy()
+                        updated["Last Edited On"] = now_str
+                        updated["Appraiser Started"] = "Yes"
+
+                        for k, v in domain_values.items():
+                            updated[k] = v
+
+                        updated["Overall Rating"] = overall_rating
+                        updated["Overall Comments"] = overall_comments
+
+                        save_final_eval_record(updated)
+                        st.success("Appraiser section saved.")
+                        _rerun()
+
+                with col_b:
+                    if st.button(
+                        "✅ Submit Appraiser Section",
+                        disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                        key=f"{teacher_email}_submit_appraiser_eval"
+                    ):
+                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        updated = fe_record.copy()
+                        updated["Last Edited On"] = now_str
+                        updated["Appraiser Started"] = "Yes"
+                        updated["Appraiser Completed"] = "Yes"
+                        updated["Appraiser Completed On"] = now_str
+
+                        for k, v in domain_values.items():
+                            updated[k] = v
+
+                        updated["Overall Rating"] = overall_rating
+                        updated["Overall Comments"] = overall_comments
+
+                        save_final_eval_record(updated)
+                        st.success("Appraiser section submitted.")
+                        _rerun()
+
+                refreshed_fe = get_teacher_final_eval_record(teacher_email)
+
+                if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
+                    if st.button("✍️ Evaluator Sign Off", key=f"{teacher_email}_evaluator_signoff"):
+                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        refreshed_fe["Last Edited On"] = now_str
+                        refreshed_fe["Evaluator Sign Off"] = "Yes"
+                        refreshed_fe["Evaluator Sign Off Date"] = now_str
+                        save_final_eval_record(refreshed_fe)
+                        st.success("Evaluator sign-off completed.")
+                        _rerun()
+
+                if evaluator_signed_off(teacher_email):
+                    st.success(f"Evaluator signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
+
+                if teacher_signed_off_final_eval(teacher_email):
+                    st.success(f"Teacher signed off on {safe_text(refreshed_fe.get('Teacher Sign Off Date', ''))}")    
 
 
 
@@ -1782,6 +2097,8 @@ if tab == "Super Admin" and i_am_sadmin:
             "Email": teacher_email,
             "Initial Status": initial_status,
             "Final Status": final_status,
+            "Teacher Final Eval": "✅ Submitted" if teacher_final_eval_completed(teacher_email) else "❌ Pending",
+            "Appraiser Final Eval": "✅ Completed" if appraiser_final_eval_completed(teacher_email) else "❌ Pending",
             "Last Initial": last_initial_date,
             "Last Final": last_final_date,
         })
