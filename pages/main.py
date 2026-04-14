@@ -266,8 +266,17 @@ def generate_final_evaluation_docx(record: dict):
     subject_area = safe_text(record.get("Subject Area", ""))
 
     # ===== TITLE =====
+    # Remove extra spacing at top (important)
+    if doc.paragraphs:
+        first_para = doc.paragraphs[0]
+        first_para.paragraph_format.space_before = Pt(0)
+        first_para.paragraph_format.space_after = Pt(0)
+    
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(6)
+    
     run = p.add_run("FINAL EVALUATION SUMMARY")
     run.bold = True
     run.font.size = Pt(14)
