@@ -2132,6 +2132,14 @@ if tab == "Admin" and i_am_admin:
                     latest_final=latest_final,
                     display_df=display_df
                     )
+
+                    csv = display_df.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        f"⬇️ Download Comparison for {teacher_choice}",
+                        data=csv,
+                        file_name=f"{teacher_choice}_comparison.csv",
+                        mime="text/csv"
+                    )
             
                 st.divider()
                         
