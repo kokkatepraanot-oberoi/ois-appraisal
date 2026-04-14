@@ -2290,6 +2290,7 @@ if tab == "Admin" and i_am_admin:
                             
                                 final_doc_record = fe_record.copy()
                                 final_doc_record["Teacher Name"] = teacher_choice
+                                final_doc_record["Appraiser"] = title_case_name(final_doc_record.get("Appraiser", st.session_state.auth_name))
     
                                 final_docx = generate_final_evaluation_docx(final_doc_record)
     
