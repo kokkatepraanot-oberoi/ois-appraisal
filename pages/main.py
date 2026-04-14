@@ -1635,33 +1635,6 @@ if tab == "My Submission":
             comparison_display = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
             render_grouped_comparison(comparison_display, key_prefix="teacher_cmp")
 
-               
-        # Optional CSV downloads
-        if latest_initial is not None and not latest_initial.empty:
-            init_csv = latest_initial.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "⬇️ Download Initial Submission (CSV)",
-                data=init_csv,
-                file_name="initial_submission.csv",
-                mime="text/csv"
-            )
-
-        if latest_final is not None and not latest_final.empty:
-            final_csv = latest_final.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "⬇️ Download Final Submission (CSV)",
-                data=final_csv,
-                file_name="final_submission.csv",
-                mime="text/csv"
-            )
-
-        comparison_csv = comparison_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "⬇️ Download Initial vs Final Comparison (CSV)",
-            data=comparison_csv,
-            file_name="initial_vs_final_comparison.csv",
-            mime="text/csv"
-        )
   
 # =========================
 # Page: Final Evaluation (Teacher)
