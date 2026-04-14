@@ -255,7 +255,11 @@ def generate_teacher_docx(teacher_name, latest_df):
 
 def generate_final_evaluation_docx(record: dict):
     template_path = os.path.join(os.path.dirname(__file__), "..", "Copy of Letter template OIS JVLR.docx")
-    doc = Document(template_path)
+
+    try:
+        doc = Document(template_path)
+    except Exception:
+        doc = Document()
 
     # Clean body if template has empty placeholder paragraphs
     while len(doc.paragraphs) > 0 and safe_text(doc.paragraphs[0].text).strip() == "":
