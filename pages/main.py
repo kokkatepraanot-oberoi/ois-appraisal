@@ -261,6 +261,11 @@ def generate_final_evaluation_docx(record: dict):
     except Exception:
         doc = Document()
 
+    # REMOVE LEADING EMPTY PARAGRAPHS (THIS IS THE RIGHT SPOT)
+    while doc.paragraphs and not doc.paragraphs[0].text.strip():
+        p = doc.paragraphs[0]._element
+        p.getparent().remove(p)
+
     teacher_name = title_case_name(record.get("Teacher Name", ""))
     appraiser_name = title_case_name(record.get("Appraiser", ""))
     subject_area = safe_text(record.get("Subject Area", ""))
