@@ -254,7 +254,7 @@ def generate_teacher_docx(teacher_name, latest_df):
     return out
 
 def generate_final_evaluation_docx(record: dict):
-    template_path = "/mnt/data/Copy of Letter template OIS JVLR.docx"
+    template_path = os.path.join(os.path.dirname(__file__), "..", "Copy of Letter template OIS JVLR.docx")
     doc = Document(template_path)
 
     # Clean body if template has empty placeholder paragraphs
