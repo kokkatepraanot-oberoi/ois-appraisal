@@ -403,6 +403,15 @@ def render_grouped_comparison(df, key_prefix="cmp"):
         st.info("No comparison data available.")
         return
 
+    domain_titles = {
+        "A": "Planning and Preparation for Learning",
+        "B": "Classroom Management",
+        "C": "Delivery of Instruction",
+        "D": "Monitoring, Assessment, and Follow-Up",
+        "E": "Family and Community Outreach",
+        "F": "Professional Responsibility",
+    }
+
     domain_order = ["A", "B", "C", "D", "E", "F"]
 
     for domain in domain_order:
@@ -411,14 +420,32 @@ def render_grouped_comparison(df, key_prefix="cmp"):
             continue
 
         display_df = domain_df[["Strand", "Initial", "Final", "Trend"]].copy()
+        display_df.index = [""] * len(display_df)  # hides row numbers
 
-        styled_df = display_df.style \
-            .map(highlight_rating, subset=["Initial", "Final"]) \
+        styled_df = (
+            display_df.style
+            .map(highlight_rating, subset=["Initial", "Final"])
             .map(highlight_trend, subset=["Trend"])
+            .set_properties(subset=["Initial", "Final", "Trend"], **{
+                "text-align": "center",
+                "padding": "6px",
+                "font-size": "13px"
+            })
+            .set_properties(subset=["Strand"], **{
+                "padding": "6px",
+                "font-size": "13px"
+            })
+        )
 
-        with st.expander(f"Domain {domain}", expanded=False):
-            st.dataframe(styled_df, use_container_width=True)
+        expander_title = f"Domain {domain} — {domain_titles.get(domain, '')}"
 
+        with st.expander(expander_title, expanded=(domain == "A")):
+            st.dataframe(
+                styled_df,
+                use_container_width=True,
+                hide_index=True
+            )
+            
 def build_printable_comparison_html(teacher_name, teacher_email, appraiser, latest_initial, latest_final, display_df):
     initial_date = ""
     final_date = ""
