@@ -397,7 +397,6 @@ def highlight_trend(val):
         return "color: #555; font-weight: 500;"
     return ""
 
-
 def render_grouped_comparison(df, key_prefix="cmp"):
     if df.empty:
         st.info("No comparison data available.")
@@ -420,7 +419,6 @@ def render_grouped_comparison(df, key_prefix="cmp"):
             continue
 
         display_df = domain_df[["Strand", "Initial", "Final", "Trend"]].copy()
-        display_df.index = [""] * len(display_df)  # hides row numbers
 
         styled_df = (
             display_df.style
@@ -445,7 +443,7 @@ def render_grouped_comparison(df, key_prefix="cmp"):
                 use_container_width=True,
                 hide_index=True
             )
-            
+
 def build_printable_comparison_html(teacher_name, teacher_email, appraiser, latest_initial, latest_final, display_df):
     initial_date = ""
     final_date = ""
