@@ -316,17 +316,20 @@ def generate_final_evaluation_docx(record: dict):
     doc.add_paragraph("")
 
     # ===== DOMAIN RATINGS =====
-    table = doc.add_table(rows=1, cols=2)
-    table.style = "Table Grid"
+    p = doc.add_paragraph()
+    run = p.add_run("Ratings on Individual Rubrics")
+    run.bold = True
+    run.font.size = Pt(12)
 
-    hdr_cells = table.rows[0].cells
-    hdr_cells[0].paragraphs[0].add_run("Domain").bold = True
-    hdr_cells[1].paragraphs[0].add_run("Rating").bold = True
+    p = doc.add_paragraph()
+    p.add_run("Domain").bold = True
+    p.add_run(" | ").bold = True
+    p.add_run("Rating").bold = True
 
     for col_name, label in final_eval_domain_rows():
-        row_cells = table.add_row().cells
-        row_cells[0].text = label
-        row_cells[1].text = safe_text(record.get(col_name, ""))
+        p = doc.add_paragraph()
+        p.add_run(f"{label}: ").bold = True
+        p.add_run(safe_text(record.get(col_name, "")))
 
     doc.add_paragraph("")
 
