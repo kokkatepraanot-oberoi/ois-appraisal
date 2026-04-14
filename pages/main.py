@@ -378,6 +378,26 @@ def render_comparison_html(df):
     """
     return html
 
+def highlight_rating(val):
+    color_map = {
+        "HE": "#a8e6a1",   # green
+        "E": "#d0f0fd",    # light blue
+        "IN": "#fff3b0",   # yellow
+        "DNMS": "#f8a5a5"  # red
+    }
+    return f"background-color: {color_map.get(val, '')}; color: black;"
+
+
+def highlight_trend(val):
+    if "Improved" in val:
+        return "color: green; font-weight: 600;"
+    elif "Dropped" in val:
+        return "color: red; font-weight: 600;"
+    elif "No change" in val:
+        return "color: #555; font-weight: 500;"
+    return ""
+
+
 def render_grouped_comparison(df, key_prefix="cmp"):
     if df.empty:
         st.info("No comparison data available.")
@@ -390,11 +410,14 @@ def render_grouped_comparison(df, key_prefix="cmp"):
         if domain_df.empty:
             continue
 
+        display_df = domain_df[["Strand", "Initial", "Final", "Trend"]].copy()
+
+        styled_df = display_df.style \
+            .map(highlight_rating, subset=["Initial", "Final"]) \
+            .map(highlight_trend, subset=["Trend"])
+
         with st.expander(f"Domain {domain}", expanded=False):
-            st.dataframe(
-                domain_df[["Strand", "Initial", "Final", "Trend"]],
-                use_container_width=True
-            )
+            st.dataframe(styled_df, use_container_width=True)
 
 def build_printable_comparison_html(teacher_name, teacher_email, appraiser, latest_initial, latest_final, display_df):
     initial_date = ""
