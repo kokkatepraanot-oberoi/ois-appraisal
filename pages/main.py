@@ -261,7 +261,14 @@ def generate_final_evaluation_docx(record: dict):
     except Exception:
         doc = Document()
 
-    # REMOVE LEADING EMPTY PARAGRAPHS (THIS IS THE RIGHT SPOT)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(3)
+    
+    run = p.add_run("FINAL EVALUATION SUMMARY")
+    run.bold = True
+    run.font.size = Pt(14)
     
 
     teacher_name = title_case_name(record.get("Teacher Name", ""))
