@@ -1772,12 +1772,31 @@ if tab == "Final Evaluation" and role == "user":
             _rerun()
 
     refreshed = get_teacher_final_eval_record(teacher_email)
+    both_signed = evaluator_signed_off(teacher_email) and teacher_signed_off_final_eval(teacher_email)
+
+    st.divider()
+    st.markdown("### Appraiser Review")
 
     if not appraiser_final_eval_completed(teacher_email):
         st.info("Your appraiser has not completed this section yet.")
-    else:
-        st.divider()
-        st.markdown("### Appraiser Review")
+
+    elif not evaluator_signed_off(teacher_email):
+        st.info("Your appraiser has completed the evaluation. The meeting will take place before sign-off.")
+
+    elif evaluator_signed_off(teacher_email) and not teacher_signed_off_final_eval(teacher_email):
+        st.info("The evaluation has been discussed and signed off by the appraiser. Please complete teacher sign-off after the meeting.")
+        st.caption("The teacher’s signature indicates that he or she has seen and discussed the evaluation; it does not necessarily denote agreement with the report.")
+
+        if st.button("✍️ Teacher Sign Off"):
+            now_str = now_ist_str()
+            refreshed["Last Edited On"] = now_str
+            refreshed["Teacher Sign Off"] = "Yes"
+            refreshed["Teacher Sign Off Date"] = now_str
+            save_final_eval_record(refreshed)
+            st.success("Teacher sign-off completed.")
+            _rerun()
+
+    if both_signed:
         st.markdown("#### Ratings on Individual Rubrics")
     
         rating_colour_map = {
@@ -1900,21 +1919,10 @@ if tab == "Final Evaluation" and role == "user":
         if evaluator_signed_off(teacher_email):
             st.success(f"{appraiser} signed off on {safe_text(refreshed.get('Evaluator Sign Off Date', ''))}")
 
-        if evaluator_signed_off(teacher_email) and not teacher_signed_off_final_eval(teacher_email):
-            if st.button("✍️ Teacher Sign Off"):
-                st.caption("The teacher’s signature indicates that he or she has seen and discussed the evaluation; it does not necessarily denote agreement with the report.")
-                now_str = now_ist_str()
-                refreshed["Last Edited On"] = now_str
-                refreshed["Teacher Sign Off"] = "Yes"
-                refreshed["Teacher Sign Off Date"] = now_str
-                save_final_eval_record(refreshed)
-                st.success("Teacher sign-off completed.")
-                _rerun()
-            
-
         if teacher_signed_off_final_eval(teacher_email):
             st.success(f"{teacher_name} signed off on {safe_text(refreshed.get('Teacher Sign Off Date', ''))}")
-            st.caption("The teacher’s signature indicates that he or she has seen and discussed the evaluation; it does not necessarily denote agreement with the report.")
+
+        st.caption("The teacher’s signature indicates that he or she has seen and discussed the evaluation; it does not necessarily denote agreement with the report.")
 
 # =========================
 # Page: Admin Panel (Admin & Super Admin)
