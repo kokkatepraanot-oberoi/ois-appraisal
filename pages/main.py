@@ -11,6 +11,8 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 import re
 from docx import Document
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from descriptors import DESCRIPTORS
 
 # =========================
@@ -242,6 +244,100 @@ def generate_teacher_docx(teacher_name, latest_df):
 
     doc = Document()
     add_summary_section_to_doc(doc, latest_record)
+
+    out = BytesIO()
+    doc.save(out)
+    out.seek(0)
+    return out
+
+def generate_final_evaluation_docx(record: dict):
+    doc = Document()
+
+    # ===== HEADER =====
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = title.add_run("OBEROI INTERNATIONAL SCHOOL")
+    run.bold = True
+    run.font.size = Pt(16)
+
+    subtitle = doc.add_paragraph()
+    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = subtitle.add_run("Final Evaluation Summary")
+    run.bold = True
+    run.font.size = Pt(14)
+
+    doc.add_paragraph("")
+
+    # ===== BASIC DETAILS =====
+    teacher_name = safe_text(record.get("Teacher Name", ""))
+    appraiser_name = safe_text(record.get("Appraiser", ""))
+    subject_area = safe_text(record.get("Subject Area", ""))
+
+    p = doc.add_paragraph()
+    p.add_run("Teacher: ").bold = True
+    p.add_run(teacher_name)
+
+    p = doc.add_paragraph()
+    p.add_run("Appraiser: ").bold = True
+    p.add_run(appraiser_name)
+
+    p = doc.add_paragraph()
+    p.add_run("Subject Area: ").bold = True
+    p.add_run(subject_area)
+
+    doc.add_paragraph("")
+
+    # ===== TEACHER SECTION =====
+    doc.add_heading("Teacher Reflection", level=2)
+    doc.add_paragraph(safe_text(record.get("Overall Reflection", "")))
+
+    doc.add_heading("Student Survey Feedback", level=2)
+    doc.add_paragraph(safe_text(record.get("Student Survey Feedback", "")))
+
+    # ===== RUBRIC RATINGS =====
+    doc.add_heading("Ratings on Individual Rubrics", level=2)
+
+    table = doc.add_table(rows=1, cols=2)
+    table.style = "Table Grid"
+
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = "Domain"
+    hdr_cells[1].text = "Rating"
+
+    for col_name, label in final_eval_domain_rows():
+        row_cells = table.add_row().cells
+        row_cells[0].text = label
+        row_cells[1].text = safe_text(record.get(col_name, ""))
+
+    doc.add_paragraph("")
+
+    # ===== OVERALL RATING =====
+    doc.add_heading("Overall Rating", level=2)
+    p = doc.add_paragraph()
+    run = p.add_run(safe_text(record.get("Overall Rating", "")))
+    run.bold = True
+    run.font.size = Pt(12)
+
+    # ===== COMMENTS =====
+    doc.add_heading("Appraiser Comments", level=2)
+    doc.add_paragraph(safe_text(record.get("Overall Comments", "")))
+
+    # ===== SIGN OFF =====
+    doc.add_heading("Sign Off", level=2)
+
+    p = doc.add_paragraph()
+    p.add_run("Appraiser signed off on: ").bold = True
+    p.add_run(safe_text(record.get("Evaluator Sign Off Date", "")))
+
+    p = doc.add_paragraph()
+    p.add_run("Teacher signed off on: ").bold = True
+    p.add_run(safe_text(record.get("Teacher Sign Off Date", "")))
+
+    doc.add_paragraph("")
+    doc.add_paragraph(
+        "The teacher’s signature indicates that he or she has seen and discussed the evaluation; "
+        "it does not necessarily denote agreement with the report."
+    )
 
     out = BytesIO()
     doc.save(out)
@@ -2163,6 +2259,20 @@ if tab == "Admin" and i_am_admin:
         
                             if teacher_signed_off_final_eval(teacher_email):
                                 st.success(f"{teacher_choice} signed off on {safe_text(fe_record.get('Teacher Sign Off Date', ''))}")
+                            
+                                final_doc_record = fe_record.copy()
+                                final_doc_record["Teacher Name"] = teacher_choice
+    
+                                final_docx = generate_final_evaluation_docx(final_doc_record)
+    
+                                st.download_button(
+                                    "📄 Download Final Evaluation Summary (DOCX)",
+                                    data=final_docx,
+                                    file_name=f"{teacher_choice}_final_evaluation_summary.docx",
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    key=f"{teacher_email}_final_eval_docx"
+                                )
+                            
                         else:
                             appraiser_locked = (
                                 not is_before_deadline(FINAL_EVAL_APPRAISER_DEADLINE)
