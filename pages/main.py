@@ -47,6 +47,9 @@ def safe_text(value):
         pass
     return str(value)
 
+def title_case_name(name: str) -> str:
+    return " ".join(part.capitalize() for part in safe_text(name).split())
+
 def highlight_ratings(val):
     colors = {
         "HE": "background-color: #a8e6a1;",   # green
@@ -251,28 +254,28 @@ def generate_teacher_docx(teacher_name, latest_df):
     return out
 
 def generate_final_evaluation_docx(record: dict):
-    doc = Document()
+    template_path = "/mnt/data/Copy of Letter template OIS JVLR.docx"
+    doc = Document(template_path)
 
-    # ===== HEADER =====
-    title = doc.add_paragraph()
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = title.add_run("OBEROI INTERNATIONAL SCHOOL")
-    run.bold = True
-    run.font.size = Pt(16)
+    # Clean body if template has empty placeholder paragraphs
+    while len(doc.paragraphs) > 0 and safe_text(doc.paragraphs[0].text).strip() == "":
+        p = doc.paragraphs[0]._element
+        p.getparent().remove(p)
 
-    subtitle = doc.add_paragraph()
-    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = subtitle.add_run("Final Evaluation Summary")
+    teacher_name = title_case_name(record.get("Teacher Name", ""))
+    appraiser_name = title_case_name(record.get("Appraiser", ""))
+    subject_area = safe_text(record.get("Subject Area", ""))
+
+    # ===== TITLE =====
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run("FINAL EVALUATION SUMMARY")
     run.bold = True
     run.font.size = Pt(14)
 
     doc.add_paragraph("")
 
     # ===== BASIC DETAILS =====
-    teacher_name = safe_text(record.get("Teacher Name", ""))
-    appraiser_name = safe_text(record.get("Appraiser", ""))
-    subject_area = safe_text(record.get("Subject Area", ""))
-
     p = doc.add_paragraph()
     p.add_run("Teacher: ").bold = True
     p.add_run(teacher_name)
@@ -287,22 +290,34 @@ def generate_final_evaluation_docx(record: dict):
 
     doc.add_paragraph("")
 
-    # ===== TEACHER SECTION =====
-    doc.add_heading("Teacher Reflection", level=2)
-    doc.add_paragraph(safe_text(record.get("Overall Reflection", "")))
+    # ===== STUDENT SURVEY =====
+    p = doc.add_paragraph()
+    run = p.add_run("Student Survey Feedback")
+    run.bold = True
+    run.font.size = Pt(12)
 
-    doc.add_heading("Student Survey Feedback", level=2)
+    p = doc.add_paragraph()
+    p.add_run("Administered by the teacher each Semester").italic = True
+
     doc.add_paragraph(safe_text(record.get("Student Survey Feedback", "")))
+    doc.add_paragraph("")
 
-    # ===== RUBRIC RATINGS =====
-    doc.add_heading("Ratings on Individual Rubrics", level=2)
+    # ===== TEACHER REFLECTION =====
+    p = doc.add_paragraph()
+    run = p.add_run("Overall Reflection by the teacher on the school year")
+    run.bold = True
+    run.font.size = Pt(12)
 
+    doc.add_paragraph(safe_text(record.get("Overall Reflection", "")))
+    doc.add_paragraph("")
+
+    # ===== DOMAIN RATINGS =====
     table = doc.add_table(rows=1, cols=2)
     table.style = "Table Grid"
 
     hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = "Domain"
-    hdr_cells[1].text = "Rating"
+    hdr_cells[0].paragraphs[0].add_run("Domain").bold = True
+    hdr_cells[1].paragraphs[0].add_run("Rating").bold = True
 
     for col_name, label in final_eval_domain_rows():
         row_cells = table.add_row().cells
@@ -312,25 +327,38 @@ def generate_final_evaluation_docx(record: dict):
     doc.add_paragraph("")
 
     # ===== OVERALL RATING =====
-    doc.add_heading("Overall Rating", level=2)
     p = doc.add_paragraph()
-    run = p.add_run(safe_text(record.get("Overall Rating", "")))
+    run = p.add_run("Overall Rating")
     run.bold = True
     run.font.size = Pt(12)
 
-    # ===== COMMENTS =====
-    doc.add_heading("Appraiser Comments", level=2)
+    p = doc.add_paragraph()
+    run = p.add_run(safe_text(record.get("Overall Rating", "")))
+    run.bold = True
+
+    doc.add_paragraph("")
+
+    # ===== APPRAISER COMMENTS =====
+    p = doc.add_paragraph()
+    run = p.add_run("Overall Appraiser Comments")
+    run.bold = True
+    run.font.size = Pt(12)
+
     doc.add_paragraph(safe_text(record.get("Overall Comments", "")))
+    doc.add_paragraph("")
 
     # ===== SIGN OFF =====
-    doc.add_heading("Sign Off", level=2)
+    p = doc.add_paragraph()
+    run = p.add_run("Sign Off")
+    run.bold = True
+    run.font.size = Pt(12)
 
     p = doc.add_paragraph()
-    p.add_run("Appraiser signed off on: ").bold = True
+    p.add_run(f"{appraiser_name} signed off on: ").bold = True
     p.add_run(safe_text(record.get("Evaluator Sign Off Date", "")))
 
     p = doc.add_paragraph()
-    p.add_run("Teacher signed off on: ").bold = True
+    p.add_run(f"{teacher_name} signed off on: ").bold = True
     p.add_run(safe_text(record.get("Teacher Sign Off Date", "")))
 
     doc.add_paragraph("")
