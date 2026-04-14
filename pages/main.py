@@ -2263,15 +2263,17 @@ if tab == "Admin" and i_am_admin:
         
                             refreshed_fe = get_teacher_final_eval_record(teacher_email)
         
-                            if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
-                                if st.button("✍️ Appraiser Sign Off", key=f"{teacher_email}_evaluator_signoff"):
-                                    now_str = now_ist_str()
-                                    refreshed_fe["Last Edited On"] = now_str
-                                    refreshed_fe["Evaluator Sign Off"] = "Yes"
-                                    refreshed_fe["Evaluator Sign Off Date"] = now_str
-                                    save_final_eval_record(refreshed_fe)
-                                    st.success("Appraiser sign-off completed.")
-                                    _rerun()
+                        if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
+                            st.info("Only click Appraiser Sign Off after the evaluation has been discussed with the teacher in the meeting. Once signed off, the evaluation will become visible to the teacher for final teacher sign-off.")
+    
+                            if st.button("✍️ Appraiser Sign Off", key=f"{teacher_email}_evaluator_signoff"):
+                                now_str = now_ist_str()
+                                refreshed_fe["Last Edited On"] = now_str
+                                refreshed_fe["Evaluator Sign Off"] = "Yes"
+                                refreshed_fe["Evaluator Sign Off Date"] = now_str
+                                save_final_eval_record(refreshed_fe)
+                                st.success("Appraiser sign-off completed.")
+                                _rerun()
         
                             if evaluator_signed_off(teacher_email):
                                 st.success(f"{st.session_state.auth_name} signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
