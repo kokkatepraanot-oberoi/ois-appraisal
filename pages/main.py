@@ -261,16 +261,6 @@ def generate_final_evaluation_docx(record: dict):
     except Exception:
         doc = Document()
 
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.space_before = Pt(0)
-    p.paragraph_format.space_after = Pt(3)
-    
-    run = p.add_run("FINAL EVALUATION SUMMARY")
-    run.bold = True
-    run.font.size = Pt(14)
-    
-
     teacher_name = title_case_name(record.get("Teacher Name", ""))
     appraiser_name = title_case_name(record.get("Appraiser", ""))
     subject_area = safe_text(record.get("Subject Area", ""))
@@ -285,7 +275,7 @@ def generate_final_evaluation_docx(record: dict):
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_before = Pt(0)
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(3)
     
     run = p.add_run("FINAL EVALUATION SUMMARY")
     run.bold = True
