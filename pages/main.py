@@ -2173,10 +2173,10 @@ if tab == "Admin" and i_am_admin:
                                     key=f"{teacher_email}_{rating_col}"
                                 )
         
-                                existing_overall = safe_text(fe_record.get("Overall Rating", ""))
-                                default_overall_index = FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0
+                            existing_overall = safe_text(fe_record.get("Overall Rating", ""))
+                            default_overall_index = FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0
             
-                                overall_rating = st.selectbox(
+                            overall_rating = st.selectbox(
                                     "Overall Rating",
                                     FINAL_EVAL_RATINGS,
                                     index=default_overall_index,
