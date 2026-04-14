@@ -2227,17 +2227,8 @@ if tab == "Admin" and i_am_admin:
                             domain_values = {}
                             for rating_col, label in final_eval_domain_rows():
                                 existing = safe_text(fe_record.get(rating_col, ""))
-                                domain_letter = rating_col.split()[0]
-                                suggested_rating = calculate_domain_rating_suggestion(teacher_email, domain_letter)
         
-                                if suggested_rating:
-                                    st.markdown(
-                                        f"<div style='color:#c62828; font-weight:600; margin-bottom:6px;'>Suggested for {domain_letter}: {suggested_rating}</div>",
-                                        unsafe_allow_html=True
-                                    )
-        
-                                default_rating = existing if existing in FINAL_EVAL_RATINGS else suggested_rating
-                                default_index = FINAL_EVAL_RATINGS.index(default_rating) if default_rating in FINAL_EVAL_RATINGS else 0
+                                default_index = FINAL_EVAL_RATINGS.index(existing) if existing in FINAL_EVAL_RATINGS else 0
         
                                 domain_values[rating_col] = st.selectbox(
                                     label,
@@ -2247,25 +2238,16 @@ if tab == "Admin" and i_am_admin:
                                     key=f"{teacher_email}_{rating_col}"
                                 )
         
-                            overall_suggested_rating = calculate_overall_rating_suggestion(teacher_email)
-        
-                            if overall_suggested_rating:
-                                st.markdown(
-                                    f"<div style='color:#c62828; font-weight:600; margin-bottom:6px;'>Suggested Overall Rating: {overall_suggested_rating}</div>",
-                                    unsafe_allow_html=True
+                                existing_overall = safe_text(fe_record.get("Overall Rating", ""))
+                                default_overall_index = FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0
+            
+                                overall_rating = st.selectbox(
+                                    "Overall Rating",
+                                    FINAL_EVAL_RATINGS,
+                                    index=default_overall_index,
+                                    disabled=appraiser_locked,
+                                    key=f"{teacher_email}_overall_rating"
                                 )
-        
-                            existing_overall = safe_text(fe_record.get("Overall Rating", ""))
-                            default_overall = existing_overall if existing_overall in FINAL_EVAL_RATINGS else overall_suggested_rating
-                            default_overall_index = FINAL_EVAL_RATINGS.index(default_overall) if default_overall in FINAL_EVAL_RATINGS else 0
-        
-                            overall_rating = st.selectbox(
-                                "Overall Rating",
-                                FINAL_EVAL_RATINGS,
-                                index=default_overall_index,
-                                disabled=appraiser_locked,
-                                key=f"{teacher_email}_overall_rating"
-                            )
         
                             overall_comments = st.text_area(
                                 "Overall Comments (150 words or less)",
