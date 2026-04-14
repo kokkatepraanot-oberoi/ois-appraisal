@@ -378,6 +378,24 @@ def render_comparison_html(df):
     """
     return html
 
+def render_grouped_comparison(df, key_prefix="cmp"):
+    if df.empty:
+        st.info("No comparison data available.")
+        return
+
+    domain_order = ["A", "B", "C", "D", "E", "F"]
+
+    for domain in domain_order:
+        domain_df = df[df["Domain"] == domain].copy()
+        if domain_df.empty:
+            continue
+
+        with st.expander(f"Domain {domain}", expanded=False):
+            st.dataframe(
+                domain_df[["Strand", "Initial", "Final", "Trend"]],
+                use_container_width=True
+            )
+
 def build_printable_comparison_html(teacher_name, teacher_email, appraiser, latest_initial, latest_final, display_df):
     initial_date = ""
     final_date = ""
@@ -1567,10 +1585,8 @@ if tab == "My Submission":
         st.markdown("### Initial vs Final Comparison")
 
         if not comparison_df.empty:
-           import streamlit.components.v1 as components
-
-           comparison_display = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
-           components.html(render_comparison_html(comparison_display), height=900, scrolling=True)
+            comparison_display = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
+            render_grouped_comparison(comparison_display, key_prefix="teacher_cmp")
 
         st.divider()
         st.markdown("### Final Evaluation Status")
@@ -2105,10 +2121,8 @@ if tab == "Admin" and i_am_admin:
                         st.warning("No Final submission found.")
             
                 if not comparison_df.empty:
-                    import streamlit.components.v1 as components
-    
                     display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
-                    components.html(render_comparison_html(display_df), height=900, scrolling=True)
+                    render_grouped_comparison(display_df, key_prefix=f"admin_cmp_{teacher_email}")
     
                     appraiser_name = safe_text(rows.sort_values("Timestamp", ascending=False).head(1).iloc[0].get("Appraiser", ""))
     
