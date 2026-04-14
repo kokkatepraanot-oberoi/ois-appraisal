@@ -17,7 +17,6 @@ from descriptors import DESCRIPTORS
 # Helper: add descriptors as subheaders (inline under column names)
 # =========================
 
-
 def add_descriptor_subheaders(df):
     """
     Append short Kim Marshall descriptors under each rubric column header.
@@ -1636,29 +1635,7 @@ if tab == "My Submission":
             comparison_display = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
             render_grouped_comparison(comparison_display, key_prefix="teacher_cmp")
 
-        st.divider()
-        st.markdown("### Final Evaluation Status")
-
-        fe_record = get_teacher_final_eval_record(st.session_state.auth_email)
-
-        if not fe_record:
-            if teacher_can_start_final_evaluation(st.session_state.auth_email):
-                st.info("Final Evaluation is available but not yet started.")
-            else:
-                st.info("Final Evaluation will unlock after your Final self-assessment submission.")
-        else:
-            st.write(f"**Teacher Submitted:** {safe_text(fe_record.get('Teacher Submitted', 'No'))}")
-            st.write(f"**Appraiser Completed:** {safe_text(fe_record.get('Appraiser Completed', 'No'))}")
-            st.write(f"**Teacher Sign Off:** {safe_text(fe_record.get('Teacher Sign Off', 'No'))}")
-
-            if appraiser_final_eval_completed(st.session_state.auth_email):
-                st.markdown("#### Final Evaluation Ratings")
-                for col_name, label in final_eval_domain_rows():
-                    st.write(f"**{label}:** {safe_text(fe_record.get(col_name, ''))}")
-
-                st.write(f"**Overall Rating:** {safe_text(fe_record.get('Overall Rating', ''))}")
-                st.write(f"**Overall Comments:** {safe_text(fe_record.get('Overall Comments', ''))}")
-        
+               
         # Optional CSV downloads
         if latest_initial is not None and not latest_initial.empty:
             init_csv = latest_initial.to_csv(index=False).encode("utf-8")
