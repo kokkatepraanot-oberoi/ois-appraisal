@@ -1486,9 +1486,6 @@ else:
     role = str(me_row.iloc[0].get("Role", "user")).lower().strip()
     campus = str(me_row.iloc[0].get("Campus", "")).strip()
 
-if role == "user":
-    if st.sidebar.button("✏️ Edit Initial Submission", use_container_width=True):
-        st.session_state["edit_initial_mode"] = True
      
 # Mirror into session (login also sets this)
 st.session_state.auth_role = role
