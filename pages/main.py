@@ -1604,7 +1604,7 @@ if tab == "Self-Assessment (Initial & Final)":
         
             st.info("Use your Initial submission on the sidebar as a reference while completing your Final self-assessment.")
             st.divider()
-            st.markdown("## Final Self-Assessment - Apr 2026")
+            st.markdown("### Final Self-Assessment - Apr 2026")
             st.caption("Please complete your final self-assessment independently. Use your initial self-assessment as a reference.")
 
         # Selections (direct widgets so sidebar progress updates live)
