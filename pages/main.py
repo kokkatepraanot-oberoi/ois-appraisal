@@ -1602,7 +1602,6 @@ if tab == "Self-Assessment (Initial & Final)":
                 use_container_width=True
             )
         
-            st.info("Use your Initial submission on the sidebar as a reference while completing your Final self-assessment.")
             st.divider()
             st.markdown("### Final Self-Assessment - Apr 2026")
             st.caption("Please complete your final self-assessment independently. Use your initial self-assessment on the sidebar as a reference.")
