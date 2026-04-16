@@ -1736,23 +1736,18 @@ if tab == "My Submission":
         top_cols = st.columns(2)
 
         with top_cols[0]:
-            if latest_initial is not None and not latest_initial.empty:
-                st.markdown("### Initial Submission")
-                initial_display = latest_initial.copy().replace({
-                    "Highly Effective": "HE",
-                    "Effective": "E",
-                    "Improvement Necessary": "IN",
-                    "Does Not Meet Standards": "DNMS"
-                })
-                st.dataframe(
-                    initial_display.style.map(
-                        highlight_ratings,
-                        subset=initial_display.columns[5:]
-                    ),
-                    use_container_width=True
-                )
-            else:
-                st.info("No Initial submission yet.")
+            st.markdown("### Initial Self-Assessment - Sep 2025")
+
+        if latest_initial is not None and not latest_initial.empty:
+            st.dataframe(
+                latest_initial.style.map(
+                    highlight_ratings,
+                    subset=latest_initial.columns[5:]
+                ),
+                use_container_width=True
+            )
+        else:
+            st.info("No initial submission available.")
 
         with top_cols[1]:
             if latest_final is not None and not latest_final.empty:
