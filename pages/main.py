@@ -1605,7 +1605,15 @@ if tab == "Self-Assessment (Initial & Final)":
             st.info("Use your Initial submission on the sidebar as a reference while completing your Final self-assessment.")
             st.divider()
             st.markdown("### Final Self-Assessment - Apr 2026")
-            st.caption("Please complete your final self-assessment independently. Use your initial self-assessment as a reference.")
+            st.caption("Please complete your final self-assessment independently. Use your initial self-assessment on the sidebar as a reference.")
+            st.info("""
+            **Please complete the Final Self-Assessment in this order:**
+            
+            **Step 1:** Review your Initial Self-Assessment from Sep 2025 above and in the sidebar reference.  
+            **Step 2:** Reflect on your practice in each domain before selecting ratings.  
+            **Step 3:** Complete all strands across Domains A–F.  
+            **Step 4:** Review your selections carefully before submitting.  
+            """)
 
         # Selections (direct widgets so sidebar progress updates live)
         selections = {}
