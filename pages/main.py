@@ -1468,70 +1468,6 @@ if st.session_state.get("auth_role") == "user":
 # Main Nav
 st.title("🌟 OIS Teacher Appraisal 2025-26")
 
-# =========================
-# TEACHER TOP NAV + SHARED UI
-# =========================
-if role == "user":
-    st.markdown("""
-    <style>
-    .teacher-top-nav {
-        position: sticky;
-        top: 0;
-        z-index: 999;
-        background: rgba(255,255,255,0.96);
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid #e5e7eb;
-        padding: 10px 0 12px 0;
-        margin-bottom: 18px;
-    }
-    .teacher-shell-card {
-        border: 1px solid #e5e7eb;
-        border-radius: 20px;
-        background: white;
-        padding: 18px 20px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-    }
-    .teacher-section-label {
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #6b7280;
-    }
-    .sticky-submit-bar {
-        position: sticky;
-        bottom: 16px;
-        z-index: 998;
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 22px;
-        box-shadow: 0 6px 20px rgba(0,0,0,0.08);
-        padding: 16px 18px;
-        margin-top: 24px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="teacher-top-nav">', unsafe_allow_html=True)
-    n1, n2, n3 = st.columns(3)
-
-    with n1:
-        if st.button("Self-Assessment", use_container_width=True, key="teacher_nav_self"):
-            st.session_state.teacher_top_nav = "Self-Assessment (Initial & Final)"
-            _rerun()
-
-    with n2:
-        if st.button("My Submission", use_container_width=True, key="teacher_nav_submission"):
-            st.session_state.teacher_top_nav = "My Submission"
-            _rerun()
-
-    with n3:
-        if st.button("Final Evaluation", use_container_width=True, key="teacher_nav_eval"):
-            st.session_state.teacher_top_nav = "Final Evaluation"
-            _rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
 if not st.session_state.auth_email:
     st.info("Please log in from the sidebar to continue.")
     st.stop()
@@ -1550,8 +1486,6 @@ else:
     role = str(me_row.iloc[0].get("Role", "user")).lower().strip()
     campus = str(me_row.iloc[0].get("Campus", "")).strip()
 
-if role == "user":
-    st.sidebar.caption("Initial Self-Assessment (Sep 2025) is locked and used as a reference.")
      
 # Mirror into session (login also sets this)
 st.session_state.auth_role = role
@@ -1578,22 +1512,9 @@ else:
     if not teacher_has_final_self:
         st.sidebar.caption("Final Evaluation unlocks after Final self-assessment submission.")
 
-# =========================
-# NAVIGATION
-# =========================
-if role == "user" and "teacher_top_nav" not in st.session_state:
-    if already_submitted:
-        st.session_state.teacher_top_nav = "My Submission"
-    else:
-        st.session_state.teacher_top_nav = "Self-Assessment (Initial & Final)"
-
+# This defines `tab`
+tab = st.sidebar.radio("Menu", nav_options, index=0)
 admin_view_mode = None
-sadmin_view_mode = None
-
-if role == "user":
-    tab = st.session_state.teacher_top_nav
-else:
-    tab = st.sidebar.radio("Menu", nav_options, index=0)
 
 if tab == "Admin" and i_am_admin:
     admin_view_mode = st.sidebar.selectbox(
@@ -1602,14 +1523,14 @@ if tab == "Admin" and i_am_admin:
         index=0
     )
 
+sadmin_view_mode = None
+
 if tab == "Super Admin" and i_am_sadmin:
     sadmin_view_mode = st.sidebar.selectbox(
         "Jump to",
         ["Summary of Teachers", "View Teacher Self-Assessment", "Self-Assessment Grid"],
         index=0
     )
-
-
 
 # =========================
 # Page: Self-Assessment (teachers who haven't submitted yet)
@@ -1618,102 +1539,65 @@ from descriptors import DESCRIPTORS  # 👈 make sure descriptors.py is in same 
 
 if tab == "Self-Assessment (Initial & Final)":
     if already_submitted and not i_am_admin:
+        # Auto-redirect teachers with submissions to My Submission
         st.success("✅ You’ve already submitted your self-assessment. Redirecting to your submission...")
         tab = "My Submission"
     else:
+        # Welcome + Appraiser info
         me = users_df[users_df["Email"] == st.session_state.auth_email].iloc[0] if not users_df.empty else {}
         appraiser = me.get("Appraiser", "Not Assigned") if isinstance(me, pd.Series) else "Not Assigned"
         st.sidebar.info(f"Your appraiser: **{appraiser}**")
 
+        # 🔹 Load draft if exists
         draft_data = load_draft(st.session_state.auth_email) or {}
+        
+        # 🔹 ALWAYS load initial/final (not inside draft condition)
         latest_initial, latest_final, comparison_df = build_teacher_initial_final(
             st.session_state.auth_email
         )
-
+        
         if draft_data:
             st.info("💾 A saved draft was found and preloaded. You can continue where you left off.")
-
-        st.markdown("""
-        <div class="teacher-shell-card">
-            <div class="teacher-section-label">Current Section</div>
-            <div style="margin-top:8px; font-size:32px; font-weight:700; line-height:1.1; color:#111827;">
-                Final Self-Assessment — Apr 2026
-            </div>
-            <div style="margin-top:10px; font-size:15px; color:#4b5563; max-width:900px;">
-                Complete your final self-assessment independently. Review your initial self-assessment first, then update each domain carefully.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.write("")
-
-        c1, c2 = st.columns(2)
-
-        with c1:
-            st.markdown("""
-            <div class="teacher-shell-card">
-                <div class="teacher-section-label">Initial Self-Assessment</div>
-                <div style="margin-top:8px; font-size:26px; font-weight:700; color:#111827;">
-                    Sep 2025
-                </div>
-                <div style="margin-top:8px; font-size:14px; color:#4b5563;">
-                    Locked and used as your baseline reference.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with c2:
-            st.markdown("""
-            <div class="teacher-shell-card">
-                <div class="teacher-section-label">Guided Steps</div>
-                <div style="margin-top:12px; font-size:14px; color:#374151; line-height:1.8;">
-                    <b>Step 1:</b> Review your Initial Self-Assessment<br>
-                    <b>Step 2:</b> Reflect before selecting ratings<br>
-                    <b>Step 3:</b> Complete all strands across Domains A–F<br>
-                    <b>Step 4:</b> Review and submit
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
+        
+        # 🔹 Show initial for Final cycle
         if CURRENT_ASSESSMENT_CYCLE == "Final" and latest_initial is not None and not latest_initial.empty:
             with st.sidebar:
-                st.markdown("### 📘 Initial Reference")
-
-                initial_record = latest_initial.iloc[0].to_dict()
-
-                for domain, items in DOMAINS.items():
-                    with st.expander(domain, expanded=False):
-                        for code, label in items:
-                            strand = f"{code} {label}"
-                            value = initial_record.get(strand, "")
-                            short_map = {
-                                "Highly Effective": "HE",
-                                "Effective": "E",
-                                "Improvement Necessary": "IN",
-                                "Does Not Meet Standards": "DNMS"
-                            }
-                            short_value = short_map.get(value, value)
-
-                            colour_map = {
-                                "HE": "🟩",
-                                "E": "🟦",
-                                "IN": "🟨",
-                                "DNMS": "🟥"
-                            }
-                            colour = colour_map.get(short_value, "⬜")
-
-                            st.markdown(f"{colour} **{code}** — {short_value}")
-
-            st.write("")
-            st.markdown("### Initial Self-Assessment - Sep 2025")
-
+               st.markdown("### 📘 Initial Reference")
+       
+               initial_record = latest_initial.iloc[0].to_dict()
+       
+               for domain, items in DOMAINS.items():
+                   with st.expander(domain, expanded=False):
+                       for code, label in items:
+                           strand = f"{code} {label}"
+                           value = initial_record.get(strand, "")
+                           short_map = {
+                               "Highly Effective": "HE",
+                               "Effective": "E",
+                               "Improvement Necessary": "IN",
+                               "Does Not Meet Standards": "DNMS"
+                           }
+                           short_value = short_map.get(value, value)
+       
+                           colour_map = {
+                               "HE": "🟩",
+                               "E": "🟦",
+                               "IN": "🟨",
+                               "DNMS": "🟥"
+                           }
+                           colour = colour_map.get(short_value, "⬜")
+       
+                           st.markdown(f"{colour} **{code}** — {short_value}")
+                 
+            st.markdown("### Your Initial Self-Assessment - Sep 2025")
+        
             initial_display = latest_initial.copy().replace({
                 "Highly Effective": "HE",
                 "Effective": "E",
                 "Improvement Necessary": "IN",
                 "Does Not Meet Standards": "DNMS"
             })
-
+        
             st.dataframe(
                 initial_display.style.map(
                     highlight_ratings,
@@ -1721,35 +1605,31 @@ if tab == "Self-Assessment (Initial & Final)":
                 ),
                 use_container_width=True
             )
+        
+            st.divider()
+            st.markdown("### Final Self-Assessment - Apr 2026")
+            st.caption("Please complete your final self-assessment independently. Use your initial self-assessment on the sidebar as a reference.")
+            st.info("""
+            **Please complete the Final Self-Assessment in this order:**
+            
+            **Step 1:** Review your Initial Self-Assessment from Sep 2025 above and in the sidebar reference.  
+            **Step 2:** Reflect on your practice in each domain before selecting ratings.  
+            **Step 3:** Complete all strands across Domains A–F.  
+            **Step 4:** Review your selections carefully before submitting.  
+            """)
 
-            st.info("Use your initial self-assessment as a reference while completing your final self-assessment.")
-
-        st.divider()
-        st.markdown("### Final Self-Assessment - Apr 2026")
-        st.info("""
-**Please complete the Final Self-Assessment in this order:**
-
-**Step 1:** Review your Initial Self-Assessment from Sep 2025 above and in the sidebar reference.  
-**Step 2:** Reflect on your practice in each domain before selecting ratings.  
-**Step 3:** Complete all strands across Domains A–F.  
-**Step 4:** Review your selections carefully before submitting.  
-        """)
-
-        st.markdown("### Complete Your Final Ratings")
-        st.caption("Work through each domain below. Use your initial submission as a reference, but rate your current practice deliberately.")
-
+        # Selections (direct widgets so sidebar progress updates live)
         selections = {}
         reflections = {}
 
         for domain, items in DOMAINS.items():
-            with st.expander(f"📘 {domain}", expanded=(domain.startswith("A:"))):
-                st.caption("Review each strand carefully before selecting a rating.")
-
+            with st.expander(domain, expanded=False):
                 for code, label in items:
                     strand_key = f"{code} {label}"
                     key = f"{code}-{label}"
                     saved_value = draft_data.get(strand_key, "")
 
+                    # Radio for selecting rating
                     selections[strand_key] = st.radio(
                         f"{strand_key}",
                         RATINGS,
@@ -1757,19 +1637,21 @@ if tab == "Self-Assessment (Initial & Final)":
                         key=key,
                     ) or ""
 
+                    # 🔹 Show descriptors (auto-expand if no saved choice yet)
                     if strand_key in DESCRIPTORS:
-                        expand_default = saved_value == ""
+                        expand_default = saved_value == ""  # open first time, collapse later
                         with st.expander("📖 See descriptors for this strand", expanded=expand_default):
                             st.markdown(f"""
-**Highly Effective (HE):** {DESCRIPTORS[strand_key]['HE']}  
+                            **Highly Effective (HE):** {DESCRIPTORS[strand_key]['HE']}  
 
-**Effective (E):** {DESCRIPTORS[strand_key]['E']}  
+                            **Effective (E):** {DESCRIPTORS[strand_key]['E']}  
 
-**Improvement Necessary (IN):** {DESCRIPTORS[strand_key]['IN']}  
+                            **Improvement Necessary (IN):** {DESCRIPTORS[strand_key]['IN']}  
 
-**Does Not Meet Standards (DNMS):** {DESCRIPTORS[strand_key]['DNMS']}  
+                            **Does Not Meet Standards (DNMS):** {DESCRIPTORS[strand_key]['DNMS']}  
                             """)
 
+                # Reflection box per domain (if enabled)
                 if ENABLE_REFLECTIONS:
                     saved_refl = draft_data.get(f"Reflection-{domain}", "")
                     reflections[domain] = st.text_area(
@@ -1779,52 +1661,44 @@ if tab == "Self-Assessment (Initial & Final)":
                         value=saved_refl,
                     )
 
+        # Submit button + progress
         selected_count = sum(1 for v in selections.values() if v)
-
-        with st.sidebar:
-            if st.button("💾 Save Draft", use_container_width=True):
-                draft_payload = {}
-                for domain, items in DOMAINS.items():
-                    for code, label in items:
-                        draft_payload[f"{code} {label}"] = selections[f"{code} {label}"]
-                    if ENABLE_REFLECTIONS:
-                        draft_payload[f"Reflection-{domain}"] = reflections.get(domain, "")
-                save_draft(st.session_state.auth_email, draft_payload)
-                st.success("✅ Draft saved!")
-
-            st.markdown(
-                """
-                <br>
-                <a href="https://drive.google.com/file/d/1GrDAkk8zev6pr4AmmKA6YyTzeUdZ8dZC/view?usp=sharing"
-                   target="_blank"
-                   style="text-decoration:none; font-weight:bold; color:#1a73e8;">
-                   📄 View Teacher Growth Rubric (Self-Assessment)
-                </a>
-                """,
-                unsafe_allow_html=True
-            )
-
-        st.markdown('<div class="sticky-submit-bar">', unsafe_allow_html=True)
-        sb1, sb2 = st.columns([2, 1])
-
-        with sb1:
-            st.markdown("**Ready to submit?**")
-            st.caption(f"{selected_count}/{total_items} sub-strands completed. Review your selections before final submission.")
-            st.progress(selected_count / total_items if total_items else 0.0)
-
-        with sb2:
+        col1, col2 = st.columns([1, 3])
+        with col1:
             submit = st.button(
-                "✅ Submit Final Self-Assessment",
-                disabled=(selected_count < total_items) or st.session_state.get("submitted", False),
-                use_container_width=True,
-                key="teacher_submit_final"
+                "✅ Submit",
+                disabled=(selected_count < total_items) or st.session_state.get("submitted", False)
             )
 
-        st.markdown('</div>', unsafe_allow_html=True)
+            # Sidebar: Save Draft
+            with st.sidebar:
+                if st.button("💾 Save Draft", use_container_width=True):
+                    draft_payload = {}
+                    for domain, items in DOMAINS.items():
+                        for code, label in items:
+                            draft_payload[f"{code} {label}"] = selections[f"{code} {label}"]
+                        if ENABLE_REFLECTIONS:
+                            draft_payload[f"Reflection-{domain}"] = reflections.get(domain, "")
+                    save_draft(st.session_state.auth_email, draft_payload)
+                    st.success("✅ Draft saved!")
 
+                # 🔗 Extra link under Save Draft
+                st.markdown(
+                    """
+                    <br>
+                    <a href="https://drive.google.com/file/d/1GrDAkk8zev6pr4AmmKA6YyTzeUdZ8dZC/view?usp=sharing"
+                       target="_blank"
+                       style="text-decoration:none; font-weight:bold; color:#1a73e8;">
+                       📄 View Teacher Growth Rubric (Self-Assessment)
+                    </a>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        # Handle Submit
         if submit:
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+        
             row = [
                 now_str,
                 st.session_state.auth_email,
@@ -1832,41 +1706,29 @@ if tab == "Self-Assessment (Initial & Final)":
                 appraiser,
                 CURRENT_ASSESSMENT_CYCLE,
             ]
-
+        
             for domain, items in DOMAINS.items():
                 for code, label in items:
                     row.append(selections[f"{code} {label}"])
                 if ENABLE_REFLECTIONS:
                     row.append(reflections.get(domain, ""))
-
-            row.append(now_str)
-
+        
+            row.append(now_str)  # Last Edited On
+        
             try:
                 with_backoff(RESP_WS.append_row, row, value_input_option="USER_ENTERED")
                 load_responses_df.clear()
                 st.session_state.submitted = True
                 st.success("🎉 Submitted. Thank you! See **My Submission** to review your responses.")
-                _rerun()
             except Exception as e:
                 st.error("⚠️ Could not submit right now. Please try again shortly.")
                 st.caption(f"Debug info: {e}")
+
 # =========================
 # Page: My Submission (teachers see their data here)
 # =========================
 if tab == "My Submission":
     st.subheader("My Submission")
-
-    st.markdown("""
-    <div class="teacher-shell-card">
-        <div class="teacher-section-label">Submission Summary</div>
-        <div style="margin-top:8px; font-size:26px; font-weight:700; color:#111827;">
-            Review Your Self-Assessments
-        </div>
-        <div style="margin-top:10px; font-size:14px; color:#4b5563;">
-            Compare your Initial and Final self-assessments and review the changes across each domain.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
     latest_initial, latest_final, comparison_df = build_teacher_initial_final(
         st.session_state.auth_email
@@ -1878,27 +1740,22 @@ if tab == "My Submission":
         top_cols = st.columns(2)
 
         with top_cols[0]:
-            if latest_initial is not None and not latest_initial.empty:
-                st.markdown("### Initial Self-Assessment - Sep 2025")
-                initial_display = latest_initial.copy().replace({
-                    "Highly Effective": "HE",
-                    "Effective": "E",
-                    "Improvement Necessary": "IN",
-                    "Does Not Meet Standards": "DNMS"
-                })
-                st.dataframe(
-                    initial_display.style.map(
-                        highlight_ratings,
-                        subset=initial_display.columns[5:]
-                    ),
-                    use_container_width=True
-                )
-            else:
-                st.info("No Initial submission yet.")
+            st.markdown("### Initial Self-Assessment - Sep 2025")
+
+        if latest_initial is not None and not latest_initial.empty:
+            st.dataframe(
+                latest_initial.style.map(
+                    highlight_ratings,
+                    subset=latest_initial.columns[5:]
+                ),
+                use_container_width=True
+            )
+        else:
+            st.info("No initial submission available.")
 
         with top_cols[1]:
             if latest_final is not None and not latest_final.empty:
-                st.markdown("### Final Self-Assessment - Apr 2026")
+                st.markdown("### Final Submission")
                 final_display = latest_final.copy().replace({
                     "Highly Effective": "HE",
                     "Effective": "E",
@@ -1921,6 +1778,8 @@ if tab == "My Submission":
         if not comparison_df.empty:
             comparison_display = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
             render_grouped_comparison(comparison_display, key_prefix="teacher_cmp")
+
+  
 # =========================
 # Page: Final Evaluation (Teacher)
 # =========================
@@ -2577,7 +2436,6 @@ if tab == "Admin" and i_am_admin:
 if tab == "Super Admin" and i_am_sadmin:
     st.header("🏫 Super Admin Panel — Campus View")
 
-    # Determine my campus (if configured)
     my_campus = str(st.session_state.get("auth_campus", "") or "").strip()
     has_campus_col = "Campus" in users_df.columns
     campus_series = (
@@ -2586,249 +2444,288 @@ if tab == "Super Admin" and i_am_sadmin:
         else None
     )
 
-    # Super admin sees all teachers in their own campus
     if campus_series is not None:
         assigned = users_df[(users_df["Role"] == "user") & (campus_series == my_campus)]
     else:
-        assigned = users_df[users_df["Role"] == "user"]  # fallback: whole school
+        assigned = users_df[users_df["Role"] == "user"]
 
     resp_df = load_responses_df()
-    summary_rows = []
 
-    initial_submitted_count = 0
-    final_submitted_count = 0
-    total_count = len(assigned)
-    
-    for _, teacher in assigned.iterrows():
-        teacher_email = teacher["Email"].strip().lower()
-        teacher_name = teacher["Name"]
-    
-        submissions = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
-    
-        if not submissions.empty:
-            if "Assessment Cycle" not in submissions.columns:
-                submissions = submissions.copy()
-                submissions["Assessment Cycle"] = "Initial"
-            else:
-                submissions = submissions.copy()
-                submissions["Assessment Cycle"] = submissions["Assessment Cycle"].replace("", "Initial")
-    
-        initial_subs = submissions[submissions["Assessment Cycle"] == "Initial"] if not submissions.empty else pd.DataFrame()
-        final_subs = submissions[submissions["Assessment Cycle"] == "Final"] if not submissions.empty else pd.DataFrame()
-    
-        initial_status = "✅ Submitted" if not initial_subs.empty else "❌ Not Submitted"
-        final_status = "✅ Submitted" if not final_subs.empty else "❌ Not Submitted"
-    
-        last_initial_date = initial_subs["Timestamp"].max() if not initial_subs.empty else "-"
-        last_final_date = final_subs["Timestamp"].max() if not final_subs.empty else "-"
-    
-        if not initial_subs.empty:
-            initial_submitted_count += 1
-        if not final_subs.empty:
-            final_submitted_count += 1
-    
-        summary_rows.append({
-            "Teacher": teacher_name,
-            "Email": teacher_email,
-            "Initial Status": initial_status,
-            "Final Status": final_status,
-            "Teacher Final Eval": "✅ Submitted" if teacher_final_eval_completed(teacher_email) else "❌ Pending",
-            "Appraiser Final Eval": "✅ Completed" if appraiser_final_eval_completed(teacher_email) else "❌ Pending",
-            "Last Initial": last_initial_date,
-            "Last Final": last_final_date,
-        })
-    
-    summary_df = pd.DataFrame(summary_rows)
-    
-    st.markdown(
-        f"**Initial:** {initial_submitted_count}/{total_count} submitted "
-        f"({round((initial_submitted_count/total_count)*100, 1) if total_count else 0}%)"
-    )
-    st.progress(initial_submitted_count / total_count if total_count else 0)
-    
-    st.markdown(
-        f"**Final:** {final_submitted_count}/{total_count} submitted "
-        f"({round((final_submitted_count/total_count)*100, 1) if total_count else 0}%)"
-    )
-    st.progress(final_submitted_count / total_count if total_count else 0)
-    
-    st.subheader("📋 Summary of All Teachers")
-    st.dataframe(summary_df, use_container_width=True)
-    
-
-    # Optional: download summary
-    csv = summary_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "⬇️ Download Whole School Summary (CSV)",
-        data=csv,
-        file_name="whole_school_summary.csv",
-        mime="text/csv"
-    )
-
-    st.divider()
-    st.subheader("🔎 View Individual Teacher Submissions")
-
-    teacher_choice = st.selectbox(
-        "Select a teacher",
-        assigned["Name"].tolist(),
-        key="sadmin_teacher_choice"
-    )
-
-    if teacher_choice:
-        teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
-        rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
-
-        latest_initial, latest_final, comparison_df = build_initial_final_comparison(rows)
-
-        st.subheader(f"Initial vs Final Comparison for {teacher_choice}")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if latest_initial is not None and not latest_initial.empty:
-                st.info(f"Initial submitted: {safe_text(latest_initial.iloc[0].get('Timestamp', ''))}")
-            else:
-                st.warning("No Initial submission found.")
-
-        with col2:
-            if latest_final is not None and not latest_final.empty:
-                st.info(f"Final submitted: {safe_text(latest_final.iloc[0].get('Timestamp', ''))}")
-            else:
-                st.warning("No Final submission found.")
-
-        if not comparison_df.empty:
-            import streamlit.components.v1 as components
-
-            display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
-            components.html(render_comparison_html(display_df), height=900, scrolling=True)
-
-            appraiser_name = safe_text(rows.sort_values("Timestamp", ascending=False).head(1).iloc[0].get("Appraiser", ""))
-
-            printable_html = build_printable_comparison_html(
-                teacher_name=teacher_choice,
-                teacher_email=teacher_email,
-                appraiser=appraiser_name,
-                latest_initial=latest_initial,
-                latest_final=latest_final,
-                display_df=display_df
-            )
-
-            
-            
-            csv = display_df.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                f"⬇️ Download Comparison for {teacher_choice}",
-                data=csv,
-                file_name=f"{teacher_choice}_comparison.csv",
-                mime="text/csv",
-                key="sadmin_comparison_csv"
-            )
-
-        st.divider()
-
-        if rows.empty:
-            st.warning(f"No submission found for {teacher_choice}.")
-        else:
-            st.subheader(f"Latest submission for {teacher_choice}")
-
-            latest = rows.sort_values("Timestamp", ascending=False).head(1)
-
-            mapping = {
-                "Highly Effective": "HE",
-                "Effective": "E",
-                "Improvement Necessary": "IN",
-                "Does Not Meet Standards": "DNMS"
-            }
-            latest_display = latest.replace(mapping)
-
-            rubric_cols = [col for col in latest_display.columns if re.match(r'^[A-F][0-9]', col)]
-
-            st.dataframe(
-                latest_display[["Timestamp", "Email", "Name", "Appraiser", "Assessment Cycle"] + rubric_cols].style.map(
-                    highlight_ratings,
-                    subset=rubric_cols
-                ),
-                use_container_width=True
-            )
-
-            csv = rows.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                f"⬇️ Download all submissions for {teacher_choice} (CSV)",
-                data=csv,
-                file_name=f"{teacher_choice}_submissions.csv",
-                mime="text/csv",
-                key="sadmin_teacher_csv"
-            )
-
-            latest_export = rows.sort_values("Timestamp", ascending=False).head(1).copy()
-
-            try:
-                docx_buffer = generate_teacher_docx(teacher_choice, latest_export)
-
-                st.download_button(
-                    f"📄 Download {teacher_choice}'s Self-Assessment (DOCX)",
-                    data=docx_buffer,
-                    file_name=f"{teacher_choice}_self_assessment_{datetime.now().strftime('%Y%m%d')}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    key="sadmin_teacher_docx"
-                )
-            except Exception as e:
-                st.error(f"Could not generate DOCX for {teacher_choice}: {e}")
-
-        st.divider()
-
-# =========================
-# Super Admin: Whole-School Submissions
-# =========================
-if tab == "Super Admin" and i_am_sadmin:
-    st.subheader("📊 Detailed Campus Submissions")
-
-    # Fetch all responses
-    df = load_responses_df()
-
-    if df.empty:
-        st.info("No submissions found yet.")
+    if assigned.empty:
+        st.info("No teachers found for this campus.")
     else:
-        # 🔹 Filter to my campus using Email → Users mapping
-        my_campus = str(st.session_state.get("auth_campus", "")).strip()
-        if "Campus" in users_df.columns and my_campus:
-            campus_map = users_df[["Email", "Campus"]].copy()
-            campus_map["Email"] = campus_map["Email"].astype(str).str.strip().str.lower()
-            campus_map["Campus"] = campus_map["Campus"].astype(str).str.strip()
+        summary_rows = []
+        initial_submitted_count = 0
+        final_submitted_count = 0
+        total_count = len(assigned)
 
-            df = df.merge(campus_map, on="Email", how="left")
-            df = df[df["Campus"] == my_campus].drop(columns=["Campus"], errors="ignore")
+        for _, teacher in assigned.iterrows():
+            teacher_email = teacher["Email"].strip().lower()
+            teacher_name = teacher["Name"]
 
-        if df.empty:
-            st.info(f"No submissions yet for **{my_campus}** campus.")
-        else:
-            # Remove reflections & goals for compactness
-            reflection_cols = [c for c in df.columns if "Reflection" in c or "Goal" in c or "Comment" in c]
-            df = df.drop(columns=reflection_cols, errors="ignore")
+            submissions = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
 
-            # Reset index for numbering
-            df.index = df.index + 1
-            df.index.name = "No."
+            if not submissions.empty:
+                if "Assessment Cycle" not in submissions.columns:
+                    submissions = submissions.copy()
+                    submissions["Assessment Cycle"] = "Initial"
+                else:
+                    submissions = submissions.copy()
+                    submissions["Assessment Cycle"] = submissions["Assessment Cycle"].replace("", "Initial")
 
-            # Replace full text with acronyms
-            mapping = {
-                "Highly Effective": "HE",
-                "Effective": "E",
-                "Improvement Necessary": "IN",
-                "Does Not Meet Standards": "DNMS"
-            }
-            df = df.replace(mapping)
+            initial_subs = submissions[submissions["Assessment Cycle"] == "Initial"] if not submissions.empty else pd.DataFrame()
+            final_subs = submissions[submissions["Assessment Cycle"] == "Final"] if not submissions.empty else pd.DataFrame()
 
-            
+            initial_status = "✅ Submitted" if not initial_subs.empty else "❌ Not Submitted"
+            final_status = "✅ Submitted" if not final_subs.empty else "❌ Not Submitted"
 
-            styled_df = df.style.map(highlight_ratings, subset=df.columns[4:])
+            last_initial_date = initial_subs["Timestamp"].max() if not initial_subs.empty else "-"
+            last_final_date = final_subs["Timestamp"].max() if not final_subs.empty else "-"
 
-            st.dataframe(styled_df, use_container_width=True)
+            if not initial_subs.empty:
+                initial_submitted_count += 1
+            if not final_subs.empty:
+                final_submitted_count += 1
 
-            # Download option
-            st.download_button(
-                "⬇️ Download campus submissions (CSV)",
-                df.to_csv(index=True).encode("utf-8"),
-                "campus_submissions.csv",
-                "text/csv"
+            summary_rows.append({
+                "Teacher": teacher_name,
+                "Email": teacher_email,
+                "Initial Status": initial_status,
+                "Final Status": final_status,
+                "Teacher Final Eval": "✅ Submitted" if teacher_final_eval_completed(teacher_email) else "❌ Pending",
+                "Appraiser Final Eval": "✅ Completed" if appraiser_final_eval_completed(teacher_email) else "❌ Pending",
+                "Last Initial": last_initial_date,
+                "Last Final": last_final_date,
+            })
+
+        summary_df = pd.DataFrame(summary_rows)
+
+        if sadmin_view_mode == "Summary of Teachers":
+            st.subheader("📋 Summary of Teachers")
+
+            st.markdown(
+                f"**Initial:** {initial_submitted_count}/{total_count} submitted "
+                f"({round((initial_submitted_count/total_count)*100, 1) if total_count else 0}%)"
             )
+            st.progress(initial_submitted_count / total_count if total_count else 0)
+
+            st.markdown(
+                f"**Final:** {final_submitted_count}/{total_count} submitted "
+                f"({round((final_submitted_count/total_count)*100, 1) if total_count else 0}%)"
+            )
+            st.progress(final_submitted_count / total_count if total_count else 0)
+
+            st.dataframe(summary_df, use_container_width=True)
+
+        if sadmin_view_mode == "Self-Assessment Grid":
+            st.divider()
+            st.subheader("📊 Submissions Grid (Campus)")
+
+            if not resp_df.empty:
+                teacher_emails = assigned["Email"].str.strip().str.lower().tolist()
+                df = resp_df[resp_df["Email"].str.strip().str.lower().isin(teacher_emails)]
+
+                if not df.empty:
+                    mapping = {
+                        "Highly Effective": "HE",
+                        "Effective": "E",
+                        "Improvement Necessary": "IN",
+                        "Does Not Meet Standards": "DNMS"
+                    }
+                    df = df.replace(mapping)
+
+                    styled_df = df.style.map(highlight_ratings, subset=df.columns[4:])
+                    st.dataframe(styled_df, use_container_width=True)
+
+                    st.download_button(
+                        "📥 Download Campus Grid (CSV)",
+                        data=df.to_csv(index=False).encode("utf-8"),
+                        file_name=f"{my_campus or 'campus'}_submissions_grid.csv",
+                        mime="text/csv",
+                    )
+                else:
+                    st.info("ℹ️ No rubric submissions yet for this campus.")
+
+        if sadmin_view_mode == "View Teacher Self-Assessment":
+            st.divider()
+            st.subheader("🔎 View Individual Submissions")
+
+            teacher_choice = st.selectbox(
+                "Select a teacher",
+                assigned["Name"].tolist(),
+                key="sadmin_teacher_choice"
+            )
+
+            if teacher_choice:
+                teacher_email = assigned.loc[assigned["Name"] == teacher_choice, "Email"].iloc[0]
+                rows = resp_df[resp_df["Email"] == teacher_email] if not resp_df.empty else pd.DataFrame()
+
+                latest_initial, latest_final, comparison_df = build_initial_final_comparison(rows)
+
+                st.subheader(f"Initial vs Final Comparison for {teacher_choice}")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    if latest_initial is not None and not latest_initial.empty:
+                        st.info(f"Initial submitted: {safe_text(latest_initial.iloc[0].get('Timestamp', ''))}")
+                    else:
+                        st.warning("No Initial submission found.")
+
+                with col2:
+                    if latest_final is not None and not latest_final.empty:
+                        st.info(f"Final submitted: {safe_text(latest_final.iloc[0].get('Timestamp', ''))}")
+                    else:
+                        st.warning("No Final submission found.")
+
+                if not comparison_df.empty:
+                    display_df = comparison_df[["Domain", "Strand", "Explanation", "Initial", "Final", "Trend"]].copy()
+                    render_grouped_comparison(display_df, key_prefix=f"sadmin_cmp_{teacher_email}")
+
+                st.divider()
+
+                if rows.empty:
+                    st.warning(f"No submission found for {teacher_choice}.")
+                else:
+                    st.subheader("Final Evaluation")
+                    fe_record = get_teacher_final_eval_record(teacher_email)
+
+                    if not teacher_final_eval_completed(teacher_email):
+                        st.info("Teacher has not yet submitted their Final Evaluation section.")
+                    else:
+                        st.success("Teacher section submitted.")
+
+                        st.write(f"**Subject Area:** {safe_text(fe_record.get('Subject Area', ''))}")
+                        st.write("**Student Survey Feedback:**")
+                        st.write(safe_text(fe_record.get("Student Survey Feedback", "")))
+                        st.write("**Overall Reflection:**")
+                        st.write(safe_text(fe_record.get("Overall Reflection", "")))
+
+                        if teacher_signed_off_final_eval(teacher_email):
+                            st.divider()
+                            render_final_evaluation_review_panel(fe_record, heading="Final Signed-Off Review")
+
+                            if evaluator_signed_off(teacher_email):
+                                st.success(f"{safe_text(fe_record.get('Appraiser', st.session_state.auth_name))} signed off on {safe_text(fe_record.get('Evaluator Sign Off Date', ''))}")
+
+                            if teacher_signed_off_final_eval(teacher_email):
+                                st.success(f"{teacher_choice} signed off on {safe_text(fe_record.get('Teacher Sign Off Date', ''))}")
+
+                            final_doc_record = fe_record.copy()
+                            final_doc_record["Teacher Name"] = teacher_choice
+                            final_doc_record["Appraiser"] = title_case_name(final_doc_record.get("Appraiser", st.session_state.auth_name))
+
+                            final_docx = generate_final_evaluation_docx(final_doc_record)
+
+                            st.download_button(
+                                "📄 Download Final Evaluation Summary (DOCX)",
+                                data=final_docx,
+                                file_name=f"{teacher_choice}_final_evaluation_summary.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                key=f"{teacher_email}_sadmin_final_eval_docx"
+                            )
+                        else:
+                            appraiser_locked = (
+                                not is_before_deadline(FINAL_EVAL_APPRAISER_DEADLINE)
+                                or teacher_signed_off_final_eval(teacher_email)
+                            )
+
+                            st.caption(f"Appraiser deadline (IST): {FINAL_EVAL_APPRAISER_DEADLINE.strftime('%d %b %Y, %I:%M %p')}")
+
+                            domain_values = {}
+                            for rating_col, label in final_eval_domain_rows():
+                                existing = safe_text(fe_record.get(rating_col, ""))
+                                default_index = FINAL_EVAL_RATINGS.index(existing) if existing in FINAL_EVAL_RATINGS else 0
+
+                                domain_values[rating_col] = st.selectbox(
+                                    label,
+                                    FINAL_EVAL_RATINGS,
+                                    index=default_index,
+                                    disabled=appraiser_locked,
+                                    key=f"{teacher_email}_sadmin_{rating_col}"
+                                )
+
+                            existing_overall = safe_text(fe_record.get("Overall Rating", ""))
+                            default_overall_index = FINAL_EVAL_RATINGS.index(existing_overall) if existing_overall in FINAL_EVAL_RATINGS else 0
+
+                            overall_rating = st.selectbox(
+                                "Overall Rating",
+                                FINAL_EVAL_RATINGS,
+                                index=default_overall_index,
+                                disabled=appraiser_locked,
+                                key=f"{teacher_email}_sadmin_overall_rating"
+                            )
+
+                            overall_comments = st.text_area(
+                                "Overall Comments (150 words or less)",
+                                value=safe_text(fe_record.get("Overall Comments", "")),
+                                height=180,
+                                disabled=appraiser_locked,
+                                key=f"{teacher_email}_sadmin_overall_comments"
+                            )
+
+                            comments_wc = count_words(overall_comments)
+                            st.caption(f"Word count: {comments_wc}/{FINAL_EVAL_MAX_WORDS_COMMENTS}")
+
+                            col_a, col_b = st.columns(2)
+
+                            with col_a:
+                                if st.button(
+                                    "💾 Save Appraiser Section",
+                                    disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                                    key=f"{teacher_email}_sadmin_save_appraiser_eval"
+                                ):
+                                    now_str = now_ist_str()
+                                    updated = fe_record.copy()
+                                    updated["Last Edited On"] = now_str
+                                    updated["Appraiser Started"] = "Yes"
+
+                                    for k, v in domain_values.items():
+                                        updated[k] = v
+
+                                    updated["Overall Rating"] = overall_rating
+                                    updated["Overall Comments"] = overall_comments
+
+                                    save_final_eval_record(updated)
+                                    st.success("Appraiser section saved.")
+                                    _rerun()
+
+                            with col_b:
+                                if st.button(
+                                    "✅ Submit Appraiser Section",
+                                    disabled=appraiser_locked or comments_wc > FINAL_EVAL_MAX_WORDS_COMMENTS,
+                                    key=f"{teacher_email}_sadmin_submit_appraiser_eval"
+                                ):
+                                    now_str = now_ist_str()
+                                    updated = fe_record.copy()
+                                    updated["Last Edited On"] = now_str
+                                    updated["Appraiser Started"] = "Yes"
+                                    updated["Appraiser Completed"] = "Yes"
+                                    updated["Appraiser Completed On"] = now_str
+
+                                    for k, v in domain_values.items():
+                                        updated[k] = v
+
+                                    updated["Overall Rating"] = overall_rating
+                                    updated["Overall Comments"] = overall_comments
+
+                                    save_final_eval_record(updated)
+                                    st.success("Appraiser section submitted.")
+                                    _rerun()
+
+                            refreshed_fe = get_teacher_final_eval_record(teacher_email)
+
+                            if appraiser_final_eval_completed(teacher_email) and not evaluator_signed_off(teacher_email) and not appraiser_locked:
+                                st.info("Only click Appraiser Sign Off after the evaluation has been discussed with the teacher in the meeting. Once signed off, the evaluation will become visible to the teacher for final teacher sign-off.")
+
+                                if st.button("✍️ Appraiser Sign Off", key=f"{teacher_email}_sadmin_evaluator_signoff"):
+                                    now_str = now_ist_str()
+                                    refreshed_fe["Last Edited On"] = now_str
+                                    refreshed_fe["Evaluator Sign Off"] = "Yes"
+                                    refreshed_fe["Evaluator Sign Off Date"] = now_str
+                                    save_final_eval_record(refreshed_fe)
+                                    st.success("Appraiser sign-off completed.")
+                                    _rerun()
+
+                            if evaluator_signed_off(teacher_email):
+                                st.success(f"{safe_text(fe_record.get('Appraiser', st.session_state.auth_name))} signed off on {safe_text(refreshed_fe.get('Evaluator Sign Off Date', ''))}")
