@@ -1202,14 +1202,14 @@ if tab == "Self-Assessment (Initial & Final)":
         if CURRENT_ASSESSMENT_CYCLE == "Final":
             step_track([
                 ("Initial self-assessment\nSep 2025 ✓", "done"),
-                ("Final self-assessment\nIn progress", "active"),
+                ("Final self-assessment\nApr 2026 - In progress", "active"),
                 ("Final evaluation\nUnlocks after step 2", "locked"),
                 ("Sign-off\nAfter meeting", "locked"),
             ])
             guidance_box(
                 "How to complete this",
                 "Rate yourself on each strand below. Your <strong>initial ratings from Sep 2025</strong> "
-                "are visible in the sidebar on the right for reference. Complete all 54 strands, "
+                "are visible in the sidebar on the right for reference. Complete all 53 strands, "
                 "then click Submit — your appraiser cannot see this until you submit."
             )
         else:
