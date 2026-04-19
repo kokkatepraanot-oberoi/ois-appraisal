@@ -1755,52 +1755,7 @@ if tab == "Self-Assessment (Initial & Final)":
         if draft_data:
             st.info("💾 A saved draft was found and preloaded. You can continue where you left off.")
         
-        # 🔹 Show initial for Final cycle
-        if CURRENT_ASSESSMENT_CYCLE == "Final" and latest_initial is not None and not latest_initial.empty:
-            with st.sidebar:
-               st.markdown("### 📘 Initial Reference")
-       
-               initial_record = latest_initial.iloc[0].to_dict()
-       
-               for domain, items in DOMAINS.items():
-                   with st.expander(domain, expanded=False):
-                       for code, label in items:
-                           strand = f"{code} {label}"
-                           value = initial_record.get(strand, "")
-                           short_map = {
-                               "Highly Effective": "HE",
-                               "Effective": "E",
-                               "Improvement Necessary": "IN",
-                               "Does Not Meet Standards": "DNMS"
-                           }
-                           short_value = short_map.get(value, value)
-       
-                           colour_map = {
-                               "HE": "🟩",
-                               "E": "🟦",
-                               "IN": "🟨",
-                               "DNMS": "🟥"
-                           }
-                           colour = colour_map.get(short_value, "⬜")
-       
-                           st.markdown(f"{colour} **{code}** — {short_value}")
-                 
-            st.markdown("### Your Initial Self-Assessment - Sep 2025")
         
-            initial_display = latest_initial.copy().replace({
-                "Highly Effective": "HE",
-                "Effective": "E",
-                "Improvement Necessary": "IN",
-                "Does Not Meet Standards": "DNMS"
-            })
-        
-            st.dataframe(
-                initial_display.style.map(
-                    highlight_ratings,
-                    subset=initial_display.columns[5:]
-                ),
-                use_container_width=True
-            )
         
             st.divider()
             st.markdown("### Final Self-Assessment - Apr 2026")
