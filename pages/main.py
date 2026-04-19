@@ -1296,6 +1296,7 @@ if tab == "Self-Assessment (Initial & Final)":
                         RATINGS,
                         index=RATINGS.index(saved_value) if saved_value in RATINGS else None,
                         key=key,
+                        horizontal=True,
                     ) or ""
 
                     # Strand descriptors
@@ -1496,15 +1497,16 @@ if tab == "Final Evaluation" and role == "user":
     subject_existing = safe_text(record.get("Subject Area", ""))
     survey_existing = safe_text(record.get("Student Survey Feedback", ""))
     reflection_existing = safe_text(record.get("Overall Reflection", ""))
-    subject_index = SUBJECT_AREA_OPTIONS.index(subject_existing) if subject_existing in SUBJECT_AREA_OPTIONS else 0
 
     with st.expander("📝 Your section — reflection & feedback", expanded=not t_submitted):
         if t_submitted:
             st.success("✅ Your section has been submitted.")
 
-        subject_area = st.selectbox(
-            "Subject Area", SUBJECT_AREA_OPTIONS, index=subject_index,
-            disabled=teacher_locked, key="fe_subject_area"
+        subject_area = st.text_input(
+            "Subject Area",
+            value=subject_existing,
+            disabled=teacher_locked, key="fe_subject_area",
+            placeholder="e.g. English, Mathematics, Science…"
         )
         student_survey_feedback = st.text_area(
             "Student Survey Feedback (150 words or less)",
