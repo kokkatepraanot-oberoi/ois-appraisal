@@ -1608,7 +1608,7 @@ if st.session_state.get("auth_role") == "user":
                 "Improvement Necessary": "IN", "Does Not Meet Standards": "DNMS"
             }
             _colour_map = {"HE": "🟩", "E": "🟦", "IN": "🟨", "DNMS": "🟥"}
-            st.sidebar.markdown("---")
+            
             st.sidebar.markdown("**📘 Initial reference · Sep 2025**")
             for _d, _items in DOMAINS.items():
                 _dletter = _d.split(":")[0]
